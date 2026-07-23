@@ -320,6 +320,7 @@ export default function App() {
   const [profFilterGroup, setProfFilterGroup] = useState('all'); // all | A | B
   const [selectedProfStudent, setSelectedProfStudent] = useState(null);
   const [profAllAttendanceLogs, setProfAllAttendanceLogs] = useState([]);
+  const [profDetailTab, setProfDetailTab] = useState('registry'); // 'registry' | 'schedule'
 
   // Manual log editing states
   const [editLogId, setEditLogId] = useState(null);
@@ -1525,6 +1526,14 @@ export default function App() {
       return matchesSearch && matchesStatus && matchesGroup;
     });
 
+    // Filter routine slots to only show professor's own items
+    const activeRoutine = (currentClass.routine || []).filter(period => {
+      if (currentPage === 'admin') return true;
+      return period.type === 'Theory' 
+        ? period.professors?.some(pr => pr.id === profId)
+        : (period.groupA?.professors?.some(pr => pr.id === profId) || period.groupB?.professors?.some(pr => pr.id === profId));
+    });
+
     const handleSubjectChange = (e) => {
       const subId = e.target.value;
       const sub = classSubjects.find(s => s.id === subId);
@@ -1532,6 +1541,7 @@ export default function App() {
         setSelectedProfSubject(sub);
       }
     };
+    const isProfessorView = currentPage === 'professor_dashboard';
 
     return (
       <div className="analytics-tab-content">
@@ -1576,274 +1586,330 @@ export default function App() {
           </div>
         </div>
 
-        {/* Stat Grid */}
-        <div className="analytics-overview-card" style={{ padding: '1.25rem' }}>
-          <div className="analytics-overview-stats" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-            <div className={`analytics-stat-pill ${avgAttendance >= 75 ? 'green' : avgAttendance >= 60 ? 'yellow' : 'red'}`}>
-              <span className="analytics-stat-num">{avgAttendance}%</span>
-              <span className="analytics-stat-label">Average Attendance</span>
-            </div>
-            <div className="analytics-stat-pill">
-              <span className="analytics-stat-num">{totalSessionsConducted}</span>
-              <span className="analytics-stat-label">Sessions Conducted</span>
-            </div>
-            <div className="analytics-stat-pill">
-              <span className="analytics-stat-num">{totalEnrolled}</span>
-              <span className="analytics-stat-label">Students Enrolled</span>
-            </div>
-            <div className={`analytics-stat-pill ${atRiskCount > 0 ? 'red' : 'green'}`}>
-              <span className="analytics-stat-num">{atRiskCount}</span>
-              <span className="analytics-stat-label">Students At Risk (&lt;75%)</span>
-            </div>
+        {/* Tab switcher for Professor Portal */}
+        {isProfessorView && (
+          <div className="tab-menu" style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.25rem' }}>
+            <button 
+              type="button" 
+              className={`tab-link ${profDetailTab === 'registry' ? 'active' : ''}`}
+              onClick={() => setProfDetailTab('registry')}
+              style={{ 
+                background: 'transparent', 
+                border: 'none', 
+                color: profDetailTab === 'registry' ? 'var(--primary-light)' : 'var(--text-dim)', 
+                borderBottom: profDetailTab === 'registry' ? '2.5px solid var(--primary-light)' : 'none', 
+                padding: '0.6rem 1.25rem', 
+                fontWeight: 700, 
+                fontSize: '0.88rem', 
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem'
+              }}
+            >
+              <SmartIcon name="user" size={13} /> Student Registry
+            </button>
+            <button 
+              type="button" 
+              className={`tab-link ${profDetailTab === 'schedule' ? 'active' : ''}`}
+              onClick={() => setProfDetailTab('schedule')}
+              style={{ 
+                background: 'transparent', 
+                border: 'none', 
+                color: profDetailTab === 'schedule' ? 'var(--primary-light)' : 'var(--text-dim)', 
+                borderBottom: profDetailTab === 'schedule' ? '2.5px solid var(--primary-light)' : 'none', 
+                padding: '0.6rem 1.25rem', 
+                fontWeight: 700, 
+                fontSize: '0.88rem', 
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem'
+              }}
+            >
+              <SmartIcon name="calendar" size={13} /> Timetable &amp; Adjustments
+            </button>
           </div>
-        </div>
+        )}
 
-        {/* Timetable & Daily Schedule Adjustments */}
-        <div className="analytics-section-card" style={{ padding: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
-            <div>
-              <h3 className="analytics-section-title" style={{ margin: 0 }}>Timetable &amp; Schedule Adjustments</h3>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)', margin: '0.15rem 0 0 0' }}>
-                View routine timetable and reschedule or cancel classes for specific dates.
-              </p>
-            </div>
-            
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Target Date:</span>
-              <input 
-                type="date" 
-                className="form-input" 
-                style={{ width: '150px', padding: '0.35rem 0.5rem', fontSize: '0.82rem', background: 'var(--bg-2)', border: '1px solid var(--border)', color: 'var(--text)' }} 
-                value={adjustmentDate} 
-                onChange={(e) => {
-                  setAdjustmentDate(e.target.value);
-                  setRescheduleDate(e.target.value);
-                }} 
-              />
-            </div>
-          </div>
-
-          {/* Routine List for the Class */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {(currentClass.routine || []).length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-dim)', fontSize: '0.85rem' }}>
-                No classes scheduled in routine yet.
+        {/* CONDITIONAL SECTION A: STUDENT REGISTRY */}
+        {(!isProfessorView || profDetailTab === 'registry') && (
+          <>
+            {/* Stat Grid */}
+            <div className="analytics-overview-card" style={{ padding: '1.25rem' }}>
+              <div className="analytics-overview-stats" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+                <div className={`analytics-stat-pill ${avgAttendance >= 75 ? 'green' : avgAttendance >= 60 ? 'yellow' : 'red'}`}>
+                  <span className="analytics-stat-num">{avgAttendance}%</span>
+                  <span className="analytics-stat-label">Average Attendance</span>
+                </div>
+                <div className="analytics-stat-pill">
+                  <span className="analytics-stat-num">{totalSessionsConducted}</span>
+                  <span className="analytics-stat-label">Sessions Conducted</span>
+                </div>
+                <div className="analytics-stat-pill">
+                  <span className="analytics-stat-num">{totalEnrolled}</span>
+                  <span className="analytics-stat-label">Students Enrolled</span>
+                </div>
+                <div className={`analytics-stat-pill ${atRiskCount > 0 ? 'red' : 'green'}`}>
+                  <span className="analytics-stat-num">{atRiskCount}</span>
+                  <span className="analytics-stat-label">Students At Risk (&lt;75%)</span>
+                </div>
               </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
-                {(currentClass.routine || []).map(period => {
-                  const adj = classAdjustments.find(a => a.periodId === period.id && a.date === adjustmentDate);
-                  
-                  const isAssigned = currentPage === 'admin' || (
-                    period.type === 'Theory' 
-                      ? period.professors?.some(pr => pr.id === profId)
-                      : (period.groupA?.professors?.some(pr => pr.id === profId) || period.groupB?.professors?.some(pr => pr.id === profId))
-                  );
+            </div>
 
-                  let statusText = 'Normal Schedule';
-                  let statusClass = 'present';
-                  if (adj) {
-                    if (adj.status === 'cancelled') {
-                      statusText = 'Cancelled Today';
-                      statusClass = 'absent_no_exit';
-                    } else if (adj.status === 'rescheduled') {
-                      statusText = `Rescheduled to ${formatDate(adj.rescheduledDate)} (${adj.rescheduledStartTime}-${adj.rescheduledEndTime})`;
-                      statusClass = 'pending';
-                    }
-                  }
+            {/* Search & Filters */}
+            <div className="analytics-section-card">
+              <div className="analytics-section-header" style={{ flexWrap: 'wrap', gap: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: '260px' }}>
+                  <div className="input-wrap" style={{ width: '100%' }}>
+                    <span className="input-icon">🔍</span>
+                    <input type="text" className="form-input" placeholder="Search by name or roll..." style={{ padding: '0.45rem 0.45rem 0.45rem 2rem', fontSize: '0.85rem' }}
+                      value={profSearchQuery} onChange={(e) => setProfSearchQuery(e.target.value)} />
+                  </div>
+                </div>
 
-                  return (
-                    <div key={period.id} style={{
-                      background: 'rgba(255,255,255,0.01)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '12px',
-                      padding: '1rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      gap: '0.75rem'
-                    }}>
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-                          <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--primary-light)' }}>
-                            {period.type === 'Theory' ? period.subjectName : `${period.groupA?.subjectName} (Group A) / ${period.groupB?.subjectName} (Group B)`}
-                          </span>
-                          <span className={`session-status-badge ${statusClass}`} style={{ fontSize: '0.65rem' }}>
-                            {statusText}
+                {/* Filter chips status */}
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  {['all', 'safe', 'risk', 'danger'].map(st => (
+                    <button key={st} className={`student-tab-btn ${profFilterStatus === st ? 'active' : ''}`}
+                      style={{ borderBottom: 'none', padding: '0.35rem 0.75rem', fontSize: '0.75rem', borderRadius: '20px', background: profFilterStatus === st ? 'rgba(124,58,237,0.12)' : 'transparent', border: '1px solid rgba(255,255,255,0.06)' }}
+                      onClick={() => setProfFilterStatus(st)}>
+                      {st === 'all' ? 'All Status' : st === 'safe' ? 'Safe (≥75%)' : st === 'risk' ? 'At Risk' : 'Danger (<60%)'}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Filter chips group */}
+                {currentSub?.type === 'Practical' && (
+                  <div style={{ display: 'flex', gap: '0.4rem', borderLeft: '1px solid var(--border)', paddingLeft: '0.75rem' }}>
+                    {['all', 'A', 'B'].map(grp => (
+                      <button key={grp} className={`student-tab-btn ${profFilterGroup === grp ? 'active' : ''}`}
+                        style={{ borderBottom: 'none', padding: '0.35rem 0.75rem', fontSize: '0.75rem', borderRadius: '20px', background: profFilterGroup === grp ? 'rgba(16,185,129,0.12)' : 'transparent', border: '1px solid rgba(255,255,255,0.06)' }}
+                        onClick={() => setProfFilterGroup(grp)}>
+                        {grp === 'all' ? 'All Groups' : `Group ${grp}`}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Students flex responsive list */}
+              <div style={{ padding: '0.5rem 0' }}>
+                <div className="prof-student-list-header">
+                  <span>Student Registry ({filteredStudents.length} matches)</span>
+                </div>
+
+                {filteredStudents.length === 0 ? (
+                  <div className="analytics-empty-state">
+                    <span style={{ fontSize: '2rem' }}>👥</span>
+                    <p>No students match the search or filter query.</p>
+                  </div>
+                ) : (
+                  <div className="prof-student-rows-container">
+                    {filteredStudents.map(student => (
+                      <div key={student.id} className="prof-student-row">
+                        <div className="prof-student-avatar-circle">{student.name.charAt(0).toUpperCase()}</div>
+                        <div className="prof-student-main">
+                          <span className="prof-student-name">{student.name}</span>
+                          <span className="prof-student-roll">Roll: {student.roll} · Group {student.group}</span>
+                        </div>
+                        
+                        <div className="prof-student-pct-section">
+                          <span className="prof-student-pct">{student.pct}%</span>
+                          <div className="subject-progress-bar-bg" style={{ width: '100px', height: '5px' }}>
+                            <div className={`subject-progress-bar-fill ${student.status}`} style={{ width: `${Math.min(student.pct, 100)}%` }} />
+                          </div>
+                          <span className="prof-student-ratio">{student.attendedCount}/{student.totalExpected} periods</span>
+                        </div>
+
+                        <div className="prof-student-status-col">
+                          <span className={`subject-status-badge ${student.status}`}>
+                            {student.status === 'safe' ? 'Safe' : student.status === 'risk' ? 'At Risk' : 'Danger'}
                           </span>
                         </div>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                          <SmartIcon name="calendar" size={13} /> {period.day}s · {period.startTime} - {period.endTime} ({period.type})
-                        </p>
-                        <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', margin: '0.2rem 0 0 0', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                          <SmartIcon name="user" size={12} /> Assigned: {period.type === 'Theory' 
-                            ? period.professors?.map(pr => pr.name).join(', ') 
-                            : `A: ${period.groupA?.professors?.map(p=>p.name).join(', ')} | B: ${period.groupB?.professors?.map(p=>p.name).join(', ')}`}
-                        </p>
-                      </div>
 
-                      {isAssigned && (
-                        <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '0.5rem' }}>
-                           {adj ? (
-                            <button className="btn-secondary" style={{ flex: 1, padding: '0.3rem 0.5rem', fontSize: '0.75rem', color: 'var(--error)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
-                              onClick={async () => {
-                                if (window.confirm('Delete adjustment and restore normal routine period?')) {
-                                  await deleteAdjustment(adj.id, currentClass.id);
-                                  const list = await getAdjustments(currentClass.id);
-                                  setClassAdjustments(list);
-                                  triggerToast('Adjustment deleted and class schedule restored!', 'success');
-                                }
-                              }}>
-                              <SmartIcon name="trash" size={13} /> Clear Adjustment
-                            </button>
-                          ) : (
-                            <button className="btn-primary" style={{ flex: 1, padding: '0.35rem 0.5rem', fontSize: '0.75rem', background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.3)', color: 'var(--primary-light)', boxShadow: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
-                              onClick={() => {
-                                setAdjustmentModalPeriod(period);
-                                setAdjustmentType('cancelled');
-                              }}>
-                              <SmartIcon name="gear" size={13} /> Adjust Schedule
-                            </button>
+                        <div className="prof-student-action">
+                          <button className="btn-secondary" style={{ padding: '0.35rem 0.85rem', fontSize: '0.78rem', borderRadius: '8px' }}
+                            onClick={() => setSelectedProfStudent(student)}>
+                            View Logs
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* CONDITIONAL SECTION B: TIMETABLE & DAILY SCHEDULE ADJUSTMENTS */}
+        {(!isProfessorView || profDetailTab === 'schedule') && (
+          <>
+            {/* Timetable & Daily Schedule Adjustments */}
+            <div className="analytics-section-card" style={{ padding: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
+                <div>
+                  <h3 className="analytics-section-title" style={{ margin: 0 }}>Timetable &amp; Schedule Adjustments</h3>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)', margin: '0.15rem 0 0 0' }}>
+                    View routine timetable and reschedule or cancel classes for specific dates.
+                  </p>
+                </div>
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Target Date:</span>
+                  <input 
+                    type="date" 
+                    className="form-input" 
+                    style={{ width: '150px', padding: '0.35rem 0.5rem', fontSize: '0.82rem', background: 'var(--bg-2)', border: '1px solid var(--border)', color: 'var(--text)' }} 
+                    value={adjustmentDate} 
+                    onChange={(e) => {
+                      setAdjustmentDate(e.target.value);
+                      setRescheduleDate(e.target.value);
+                    }} 
+                  />
+                </div>
+              </div>
+
+              {/* Routine List for the Class (Filtered) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {activeRoutine.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-dim)', fontSize: '0.85rem' }}>
+                    No routine classes assigned to you for this class.
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
+                    {activeRoutine.map(period => {
+                      const adj = classAdjustments.find(a => a.periodId === period.id && a.date === adjustmentDate);
+                      
+                      const isAssigned = currentPage === 'admin' || (
+                        period.type === 'Theory' 
+                          ? period.professors?.some(pr => pr.id === profId)
+                          : (period.groupA?.professors?.some(pr => pr.id === profId) || period.groupB?.professors?.some(pr => pr.id === profId))
+                      );
+
+                      let statusText = 'Normal Schedule';
+                      let statusClass = 'present';
+                      if (adj) {
+                        if (adj.status === 'cancelled') {
+                          statusText = 'Cancelled Today';
+                          statusClass = 'absent_no_exit';
+                        } else if (adj.status === 'rescheduled') {
+                          statusText = `Rescheduled to ${formatDate(adj.rescheduledDate)} (${adj.rescheduledStartTime}-${adj.rescheduledEndTime})`;
+                          statusClass = 'pending';
+                        }
+                      }
+
+                      return (
+                        <div key={period.id} style={{
+                          background: 'rgba(255,255,255,0.01)',
+                          border: '1px solid var(--border)',
+                          borderRadius: '12px',
+                          padding: '1rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.75rem',
+                          justifyContent: 'space-between'
+                        }}>
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                              <span style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text)' }}>
+                                {period.type === 'Theory' ? period.subjectName : `Practical (${period.groupA.subjectName}/${period.groupB.subjectName})`}
+                              </span>
+                              <span className={`session-status-badge ${statusClass}`} style={{ fontSize: '0.68rem', padding: '0.15rem 0.45rem' }}>
+                                {statusText}
+                              </span>
+                            </div>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--text)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <SmartIcon name="calendar" size={13} /> {period.day}s · {period.startTime} - {period.endTime} ({period.type})
+                            </p>
+                            <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', margin: '0.2rem 0 0 0', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <SmartIcon name="user" size={12} /> Assigned: {period.type === 'Theory' 
+                                ? period.professors?.map(pr => pr.name).join(', ') 
+                                : `A: ${period.groupA?.professors?.map(p=>p.name).join(', ')} | B: ${period.groupB?.professors?.map(p=>p.name).join(', ')}`}
+                            </p>
+                          </div>
+
+                          {isAssigned && (
+                            <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '0.5rem' }}>
+                               {adj ? (
+                                <button className="btn-secondary" style={{ flex: 1, padding: '0.3rem 0.5rem', fontSize: '0.75rem', color: 'var(--error)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
+                                  onClick={async () => {
+                                    if (window.confirm('Delete adjustment and restore normal routine period?')) {
+                                      await deleteAdjustment(adj.id, currentClass.id);
+                                      const list = await getAdjustments(currentClass.id);
+                                      setClassAdjustments(list);
+                                      triggerToast('Adjustment deleted and class schedule restored!', 'success');
+                                    }
+                                  }}>
+                                  <SmartIcon name="trash" size={13} /> Clear Adjustment
+                                </button>
+                              ) : (
+                                <button className="btn-primary" style={{ flex: 1, padding: '0.35rem 0.5rem', fontSize: '0.75rem', background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.3)', color: 'var(--primary-light)', boxShadow: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
+                                  onClick={() => {
+                                    setAdjustmentModalPeriod(period);
+                                    setAdjustmentType('cancelled');
+                                  }}>
+                                  <SmartIcon name="gear" size={13} /> Adjust Schedule
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Search & Filters */}
-        <div className="analytics-section-card">
-          <div className="analytics-section-header" style={{ flexWrap: 'wrap', gap: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: '260px' }}>
-              <div className="input-wrap" style={{ width: '100%' }}>
-                <span className="input-icon">🔍</span>
-                <input type="text" className="form-input" placeholder="Search by name or roll..." style={{ padding: '0.45rem 0.45rem 0.45rem 2rem', fontSize: '0.85rem' }}
-                  value={profSearchQuery} onChange={(e) => setProfSearchQuery(e.target.value)} />
-              </div>
-            </div>
-
-            {/* Filter chips status */}
-            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-              {['all', 'safe', 'risk', 'danger'].map(st => (
-                <button key={st} className={`student-tab-btn ${profFilterStatus === st ? 'active' : ''}`}
-                  style={{ borderBottom: 'none', padding: '0.35rem 0.75rem', fontSize: '0.75rem', borderRadius: '20px', background: profFilterStatus === st ? 'rgba(124,58,237,0.12)' : 'transparent', border: '1px solid rgba(255,255,255,0.06)' }}
-                  onClick={() => setProfFilterStatus(st)}>
-                  {st === 'all' ? 'All Status' : st === 'safe' ? 'Safe (≥75%)' : st === 'risk' ? 'At Risk' : 'Danger (<60%)'}
-                </button>
-              ))}
-            </div>
-
-            {/* Filter chips group */}
-            {currentSub?.type === 'Practical' && (
-              <div style={{ display: 'flex', gap: '0.4rem', borderLeft: '1px solid var(--border)', paddingLeft: '0.75rem' }}>
-                {['all', 'A', 'B'].map(grp => (
-                  <button key={grp} className={`student-tab-btn ${profFilterGroup === grp ? 'active' : ''}`}
-                    style={{ borderBottom: 'none', padding: '0.35rem 0.75rem', fontSize: '0.75rem', borderRadius: '20px', background: profFilterGroup === grp ? 'rgba(16,185,129,0.12)' : 'transparent', border: '1px solid rgba(255,255,255,0.06)' }}
-                    onClick={() => setProfFilterGroup(grp)}>
-                    {grp === 'all' ? 'All Groups' : `Group ${grp}`}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Students flex responsive list */}
-          <div style={{ padding: '0.5rem 0' }}>
-            <div className="prof-student-list-header">
-              <span>Student Registry ({filteredStudents.length} matches)</span>
-            </div>
-
-            {filteredStudents.length === 0 ? (
-              <div className="analytics-empty-state">
-                <span style={{ fontSize: '2rem' }}>👥</span>
-                <p>No students match the search or filter query.</p>
-              </div>
-            ) : (
-              <div className="prof-student-rows-container">
-                {filteredStudents.map(student => (
-                  <div key={student.id} className="prof-student-row">
-                    <div className="prof-student-avatar-circle">{student.name.charAt(0).toUpperCase()}</div>
-                    <div className="prof-student-main">
-                      <span className="prof-student-name">{student.name}</span>
-                      <span className="prof-student-roll">Roll: {student.roll} · Group {student.group}</span>
-                    </div>
-                    
-                    <div className="prof-student-pct-section">
-                      <span className="prof-student-pct">{student.pct}%</span>
-                      <div className="subject-progress-bar-bg" style={{ width: '100px', height: '5px' }}>
-                        <div className={`subject-progress-bar-fill ${student.status}`} style={{ width: `${Math.min(student.pct, 100)}%` }} />
-                      </div>
-                      <span className="prof-student-ratio">{student.attendedCount}/{student.totalExpected} periods</span>
-                    </div>
-
-                    <div className="prof-student-status-col">
-                      <span className={`subject-status-badge ${student.status}`}>
-                        {student.status === 'safe' ? 'Safe' : student.status === 'risk' ? 'At Risk' : 'Danger'}
-                      </span>
-                    </div>
-
-                    <div className="prof-student-action">
-                      <button className="btn-secondary" style={{ padding: '0.35rem 0.85rem', fontSize: '0.78rem', borderRadius: '8px' }}
-                        onClick={() => setSelectedProfStudent(student)}>
-                        View Logs
-                      </button>
-                    </div>
+                      );
+                    })}
                   </div>
-                ))}
+                )}
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Sessions Conducted Timeline */}
-        <div className="analytics-section-card">
-          <div className="analytics-section-header">
-            <h3 className="analytics-section-title">Sessions Conducted ({sessionsList.length})</h3>
-          </div>
-
-          {sessionsList.length === 0 ? (
-            <div className="analytics-empty-state">
-              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.5rem', color: 'var(--text-dim)' }}>
-                <SmartIcon name="calendar" size={32} color="var(--text-dim)" />
-              </span>
-              <p>No lectures have been logged for this subject yet.</p>
             </div>
-          ) : (
-            <div className="session-log-table-wrap">
-              <table className="session-log-table">
-                <thead>
-                  <tr>
-                    <th>Session Date</th>
-                    <th>Period Time</th>
-                    <th>Students Present</th>
-                    <th>Attendance Ratio</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sessionsList.map(session => {
-                    const ratio = totalEnrolled > 0 ? Math.round((session.presentCount / totalEnrolled) * 100) : 0;
-                    return (
-                      <tr key={session.key} className="session-log-row">
-                        <td className="session-log-date" style={{ fontWeight: 600 }}>{formatDate(session.date)}</td>
-                        <td>{session.periodStart} – {session.periodEnd}</td>
-                        <td>{session.presentCount} present</td>
-                        <td>
-                          <span className={`session-status-badge ${ratio >= 75 ? 'present' : ratio >= 50 ? 'pending' : 'absent_no_exit'}`}>
-                            {ratio}%
-                          </span>
-                        </td>
+
+            {/* Sessions Conducted Timeline */}
+            <div className="analytics-section-card">
+              <div className="analytics-section-header">
+                <h3 className="analytics-section-title">Sessions Conducted ({sessionsList.length})</h3>
+              </div>
+
+              {sessionsList.length === 0 ? (
+                <div className="analytics-empty-state">
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.5rem', color: 'var(--text-dim)' }}>
+                    <SmartIcon name="calendar" size={32} color="var(--text-dim)" />
+                  </span>
+                  <p>No lectures have been logged for this subject yet.</p>
+                </div>
+              ) : (
+                <div className="session-log-table-wrap">
+                  <table className="session-log-table">
+                    <thead>
+                      <tr>
+                        <th>Session Date</th>
+                        <th>Period Time</th>
+                        <th>Students Present</th>
+                        <th>Attendance Ratio</th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody>
+                      {sessionsList.map(session => {
+                        const ratio = totalEnrolled > 0 ? Math.round((session.presentCount / totalEnrolled) * 100) : 0;
+                        return (
+                          <tr key={session.key} className="session-log-row">
+                            <td className="session-log-date" style={{ fontWeight: 600 }}>{formatDate(session.date)}</td>
+                            <td>{session.periodStart} – {session.periodEnd}</td>
+                            <td>{session.presentCount} present</td>
+                            <td>
+                              <span className={`session-status-badge ${ratio >= 75 ? 'present' : ratio >= 50 ? 'pending' : 'absent_no_exit'}`}>
+                                {ratio}%
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
     );
   };
@@ -2085,6 +2151,11 @@ export default function App() {
 
     const currentSub = selectedProfSubject || (classSubjects.length > 0 ? classSubjects[0] : null);
 
+    // Get all class logs for this student to segment by subject
+    const studentClassLogs = profAllAttendanceLogs.filter(log => log.studentId === selectedProfStudent.id && log.classId === currentClass.id);
+    const taughtSubjectLogs = studentClassLogs.filter(log => log.subjectId === currentSub?.id || log.subjectName === currentSub?.name);
+    const otherSubjectLogs = studentClassLogs.filter(log => !(log.subjectId === currentSub?.id || log.subjectName === currentSub?.name));
+
     return (
       <div className="modal-overlay open" onClick={(e) => e.target.classList.contains('modal-overlay') && setSelectedProfStudent(null)}>
         <div className="modal" style={{ maxWidth: '520px', padding: '1.75rem', zIndex: 1200 }}>
@@ -2180,9 +2251,11 @@ export default function App() {
             </button>
           </div>
 
-          <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-dim)', display: 'block', marginBottom: '0.5rem' }}>Check-In/Out History Logs</span>
+          <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--primary-light)', display: 'block', marginBottom: '0.5rem' }}>
+            Taught Subject Logs ({currentSub?.name || 'Active Subject'})
+          </span>
 
-          <div style={{ maxHeight: '240px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '8px' }}>
+          <div style={{ maxHeight: '160px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '8px', marginBottom: '1.25rem' }}>
             <table className="session-log-table">
               <thead>
                 <tr>
@@ -2194,7 +2267,7 @@ export default function App() {
                 </tr>
               </thead>
               <tbody>
-                {selectedProfStudent.logs.map(log => {
+                {taughtSubjectLogs.map(log => {
                   const isEditing = log.id === editLogId;
                   if (isEditing) {
                     return (
@@ -2247,10 +2320,50 @@ export default function App() {
                     </tr>
                   );
                 })}
-                {selectedProfStudent.logs.length === 0 && (
+                {taughtSubjectLogs.length === 0 && (
                   <tr>
                     <td colSpan="5" style={{ textAlign: 'center', padding: '1.5rem 0', color: 'var(--text-dim)', fontStyle: 'italic' }}>
-                      No checked attendance slots logged.
+                      No attendance slots logged for this subject.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-dim)', display: 'block', marginBottom: '0.5rem' }}>
+            Other Subjects Logs
+          </span>
+
+          <div style={{ maxHeight: '160px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '8px', marginBottom: '1rem' }}>
+            <table className="session-log-table">
+              <thead>
+                <tr>
+                  <th style={{ padding: '0.5rem 0.5rem' }}>Subject</th>
+                  <th style={{ padding: '0.5rem 0.5rem' }}>Date</th>
+                  <th style={{ padding: '0.5rem 0.5rem' }}>In/Out</th>
+                  <th style={{ padding: '0.5rem 0.5rem' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {otherSubjectLogs.map(log => (
+                  <tr key={log.id} className="session-log-row">
+                    <td style={{ padding: '0.5rem 0.5rem', fontWeight: '600' }}>{log.subjectName}</td>
+                    <td style={{ padding: '0.5rem 0.5rem' }}>{formatDate(log.entryTime)}</td>
+                    <td style={{ padding: '0.5rem 0.5rem', fontSize: '0.72rem' }}>
+                      {formatTime(log.entryTime)} – {log.exitTime ? formatTime(log.exitTime) : 'pending'}
+                    </td>
+                    <td style={{ padding: '0.5rem 0.5rem' }}>
+                      <span className={`session-status-badge ${log.exitTime && log.status === 'present' ? 'present' : 'absent_no_exit'}`}>
+                        {log.exitTime && log.status === 'present' ? 'Present' : 'Stale/Incomplete'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {otherSubjectLogs.length === 0 && (
+                  <tr>
+                    <td colSpan="4" style={{ textAlign: 'center', padding: '1.5rem 0', color: 'var(--text-dim)', fontStyle: 'italic' }}>
+                      No other subjects attendance logs recorded.
                     </td>
                   </tr>
                 )}
@@ -5031,7 +5144,7 @@ export default function App() {
         isTaught,
         taughtSubjects
       };
-    });
+    }).filter(cls => cls.isTaught);
 
     const currentClass = selectedProfClass ? classes.find(c => c.id === selectedProfClass.id) : null;
     
@@ -5147,6 +5260,7 @@ export default function App() {
       setProfFilterStatus('all');
       setProfFilterGroup('all');
       setSelectedProfStudent(null);
+      setProfDetailTab('registry');
     };
 
     const handleSubjectChange = (e) => {
@@ -5207,12 +5321,12 @@ export default function App() {
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                         <span className="subject-analytics-name" style={{ fontSize: '1.1rem' }}>{cls.name}</span>
-                        <span className={`session-status-badge ${cls.isTaught ? 'present' : 'upcoming'}`}>
-                          {cls.isTaught ? 'Assigned' : 'View Only'}
+                        <span className="session-status-badge present">
+                          Assigned
                         </span>
                       </div>
                       <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginBottom: '0.75rem' }}>
-                        {cls.program} · Semester {cls.semester}
+                        {cls.program} · Sem {cls.semester} · Batch {cls.batchStart}-{cls.batchEnd}
                       </p>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', margin: '0.5rem 0' }}>

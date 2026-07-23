@@ -648,7 +648,7 @@ export default function App() {
       }
 
       // Is now in the exit window? (last 5 min or after end, same day)
-      if (nowMinutes >= exitOpenMin && nowMinutes <= endMin + 24 * 60) {
+      if (nowMinutes >= exitOpenMin && nowMinutes <= endMin + 15) {
         exitWindowPeriod = p;
         nextPeriod = relevantPeriods[i + 1] || null;
         break;
@@ -4238,19 +4238,9 @@ export default function App() {
                     </svg>
                     {scanAnimating ? 'Scanning...' : (pendingEntry ? '📷 Open Camera to Exit Class' : '📷 Open Camera to Scan QR')}
                   </button>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.75rem', alignItems: 'center' }}>
-                    <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', margin: 0 }}>
-                      Uses device camera to scan the official AttendX QR poster.
-                    </p>
-                    <button 
-                      type="button" 
-                      onClick={handleSimulateScan}
-                      style={{ background: 'transparent', border: 'none', color: 'var(--primary-light)', fontSize: '0.72rem', textDecoration: 'underline', cursor: 'pointer' }}
-                    >
-                      ⚡ Bypass & Simulate QR Scan (Developer Option)
-                    </button>
-                  </div>
+                  <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '0.5rem', textAlign: 'center' }}>
+                    Uses device camera to scan the official AttendX QR poster.
+                  </p>
 
                   {/* CAMERA OVERLAY MODAL */}
                   {isScanning && (

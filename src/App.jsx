@@ -265,7 +265,6 @@ export default function App() {
   const [toast, setToast] = useState(null);
 
   // Geofencing and schedule adjustments states
-  const [mockGcectLocation, setMockGcectLocation] = useState(true); // Default checked for testing
   const [geoChecking, setGeoChecking] = useState(false);
   const [classAdjustments, setClassAdjustments] = useState([]);
   const [studentAdjustments, setStudentAdjustments] = useState([]);
@@ -994,34 +993,67 @@ export default function App() {
   const startCameraScanner = async () => {
     setScannerError(null);
     setIsScanning(true);
+    setGeoChecking(true);
 
-    // Wait for the reader element to mount
-    setTimeout(() => {
-      try {
-        const html5QrCode = new Html5Qrcode("reader");
-        html5QrCodeRef.current = html5QrCode;
-
-        html5QrCode.start(
-          { facingMode: "environment" },
-          {
-            fps: 10,
-            qrbox: { width: 250, height: 250 }
-          },
-          async (qrMessage) => {
-            await handleSuccessfulScan(qrMessage);
-          },
-          (err) => {
-            // Silent debug failures
-          }
-        ).catch(err => {
-          console.error("Camera start error:", err);
-          setScannerError("Camera permission denied or no camera found. Please verify permissions.");
+    try {
+      // 1. Strictly query GPS coordinates first (ask for permission)
+      const geoResult = await checkGeofence();
+      
+      // 2. Reject scanning if not on campus (out of 200m range)
+      if (!geoResult.inRange) {
+        setGeoChecking(false);
+        setIsScanning(false);
+        setScanState({
+          type: 'geo_error',
+          icon: '📍',
+          title: 'Out of Campus Range',
+          message: `You are currently ${geoResult.distance} meters away from the GCECT campus.`,
+          subMessage: 'Attendance check-in/out is strictly restricted to GCECT campus bounds (200m). Please scan inside the campus.'
         });
-      } catch (err) {
-        console.error("Scanner setup failed:", err);
-        setScannerError("Failed to initialize scanner. Try refreshing the page.");
+        return;
       }
-    }, 120);
+
+      // 3. In range! Proceed to mount scanner and start camera stream
+      setGeoChecking(false);
+
+      setTimeout(() => {
+        try {
+          const html5QrCode = new Html5Qrcode("reader");
+          html5QrCodeRef.current = html5QrCode;
+
+          html5QrCode.start(
+            { facingMode: "environment" },
+            {
+              fps: 10,
+              qrbox: { width: 250, height: 250 }
+            },
+            async (qrMessage) => {
+              await handleSuccessfulScan(qrMessage);
+            },
+            (err) => {
+              // Silent debug failures
+            }
+          ).catch(err => {
+            console.error("Camera start error:", err);
+            setScannerError("Camera permission denied or no camera found. Please verify permissions.");
+          });
+        } catch (err) {
+          console.error("Scanner setup failed:", err);
+          setScannerError("Failed to initialize scanner. Try refreshing the page.");
+        }
+      }, 200);
+
+    } catch (err) {
+      setGeoChecking(false);
+      setIsScanning(false);
+      setScanState({
+        type: 'geo_error',
+        icon: '📍',
+        title: 'Location Access Required',
+        message: 'Could not access your location.',
+        subMessage: err.message || 'Please grant GPS/location permission in your browser/device settings and try again.'
+      });
+    }
   };
 
   /** Stop the camera QR scanner stream */
@@ -1042,87 +1074,17 @@ export default function App() {
     // 1. Instantly stop the camera feed
     await stopCameraScanner();
 
-    // 2. Animate and check geofence range
+    // 2. Animate and process scanned QR code
     setScanAnimating(true);
-    setGeoChecking(true);
-
     try {
-      let geoResult = { inRange: true, distance: 0 };
-      if (!mockGcectLocation) {
-        geoResult = await checkGeofence();
-      }
-
-      setScanAnimating(false);
-      setGeoChecking(false);
-
-      if (!geoResult.inRange) {
-        setScanState({
-          type: 'geo_error',
-          icon: '📍',
-          title: 'Out of Campus Range',
-          message: `You are currently ${geoResult.distance} meters away from the GCECT campus.`,
-          subMessage: `Attendance scans are restricted to GCECT campus radius (200m). Please scan inside the campus.`
-        });
-        return;
-      }
-
-      // 3. Process the scanned QR data payload
       const result = await processQRScan(qrMessage, activeStudentInfo);
+      setScanAnimating(false);
       setScanState(result);
     } catch (err) {
       setScanAnimating(false);
-      setGeoChecking(false);
       setScanState({
-        type: 'geo_error',
-        icon: '📍',
-        title: 'Location Access Required',
-        message: 'Could not access your location. Please grant GPS permission to verify you are on campus.',
-        subMessage: err.message || 'Location lookup timed out.'
-      });
-    }
-  };
-
-  /** Handle the simulate-scan button press */
-  const handleSimulateScan = async () => {
-    if (!activeStudentInfo) return;
-    setScanAnimating(true);
-    setGeoChecking(true);
-    
-    try {
-      let geoResult = { inRange: true, distance: 0 };
-      
-      if (!mockGcectLocation) {
-        geoResult = await checkGeofence();
-      }
-      
-      setTimeout(async () => {
-        setScanAnimating(false);
-        setGeoChecking(false);
-        
-        if (!geoResult.inRange) {
-          setScanState({
-            type: 'geo_error',
-            icon: '📍',
-            title: 'Out of Campus Range',
-            message: `You are currently ${geoResult.distance} meters away from the GCECT campus.`,
-            subMessage: `Attendance scans are restricted to GCECT campus radius (200m). Please scan inside the campus.`
-          });
-          return;
-        }
-
-        const qrData = `attendx://mark-attendance?classId=${activeStudentInfo.classId}`;
-        const result = await processQRScan(qrData, activeStudentInfo);
-        setScanState(result);
-      }, 1200);
-    } catch (err) {
-      setScanAnimating(false);
-      setGeoChecking(false);
-      setScanState({
-        type: 'geo_error',
-        icon: '📍',
-        title: 'Location Access Required',
-        message: 'Could not access your location. Please grant GPS permission to verify you are on campus.',
-        subMessage: err.message || 'Location lookup timed out.'
+        type: 'error',
+        message: err.message || 'Failed to record attendance scan.'
       });
     }
   };
@@ -4261,67 +4223,49 @@ export default function App() {
                           </button>
                         </div>
 
-                        <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0, textAlign: 'center' }}>
-                          Please point your device camera at the QR code displayed on the professor's screen.
-                        </p>
-
-                        <div 
-                          id="reader" 
-                          style={{ 
-                            width: '100%', 
-                            borderRadius: '12px', 
-                            overflow: 'hidden', 
-                            background: '#0a0a0e', 
-                            border: '1.5px solid var(--border)',
-                            boxShadow: 'inset 0 0 10px rgba(0,0,0,0.8)'
-                          }}
-                        ></div>
-
-                        {/* GCECT Geofencing Widget inside popup modal */}
-                        <div style={{
-                          width: '100%',
-                          padding: '0.85rem 1rem',
-                          background: 'rgba(255, 255, 255, 0.02)',
-                          border: '1px solid rgba(255, 255, 255, 0.05)',
-                          borderRadius: '12px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '0.5rem',
-                          textAlign: 'left'
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text)' }}>
-                              📍 Geofencing: <span style={{ color: 'var(--primary-light)' }}>GCECT Campus</span>
-                            </span>
-                            <span style={{
-                              fontSize: '0.68rem',
-                              padding: '0.2rem 0.5rem',
-                              borderRadius: '10px',
-                              background: mockGcectLocation ? 'rgba(16, 185, 129, 0.12)' : 'rgba(124, 58, 237, 0.12)',
-                              color: mockGcectLocation ? 'var(--accent-light)' : 'var(--primary-light)',
-                              fontWeight: 700
-                            }}>
-                              {mockGcectLocation ? 'Mock Active' : 'Real GPS Active'}
+                        {geoChecking ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem', gap: '1rem', minHeight: '200px', textAlign: 'center' }}>
+                            <span className="spinner-mini" style={{ width: '40px', height: '40px', border: '3px solid var(--primary-light)', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.6s linear infinite' }} />
+                            <span style={{ fontSize: '0.9rem', color: 'var(--text)', fontWeight: 600 }}>📍 GCECT Geofence Lock</span>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>
+                              Verifying physical location... Please allow device GPS location permissions when prompted by your browser.
                             </span>
                           </div>
+                        ) : (
+                          <>
+                            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0, textAlign: 'center' }}>
+                              Please point your device camera at the QR code displayed on the professor's screen.
+                            </p>
 
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.75rem', color: 'var(--text-dim)', userSelect: 'none' }}>
-                            <input
-                              type="checkbox"
-                              checked={mockGcectLocation}
-                              onChange={(e) => setMockGcectLocation(e.target.checked)}
-                              style={{ accentColor: 'var(--primary)' }}
-                            />
-                            Mock current location at GCECT Campus
-                          </label>
-                          
-                          {geoChecking && (
-                            <div style={{ fontSize: '0.7rem', color: 'var(--primary-light)', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.2rem' }}>
-                              <span className="spinner-mini" style={{ width: '10px', height: '10px', border: '2px solid var(--primary-light)', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.6s linear infinite' }} />
-                              Querying GPS coordinates...
+                            <div 
+                              id="reader" 
+                              style={{ 
+                                width: '100%', 
+                                borderRadius: '12px', 
+                                overflow: 'hidden', 
+                                background: '#0a0a0e', 
+                                border: '1.5px solid var(--border)',
+                                boxShadow: 'inset 0 0 10px rgba(0,0,0,0.8)'
+                              }}
+                            ></div>
+
+                            <div style={{
+                              width: '100%',
+                              padding: '0.65rem 0.85rem',
+                              background: 'rgba(16, 185, 129, 0.08)',
+                              border: '1px solid rgba(16, 185, 129, 0.15)',
+                              borderRadius: '8px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.4rem'
+                            }}>
+                              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-light)' }}>
+                                📍 GCECT Campus Location Verified (Active)
+                              </span>
                             </div>
-                          )}
-                        </div>
+                          </>
+                        )}
 
                         {scannerError && (
                           <div style={{ color: '#ef4444', fontSize: '0.72rem', textAlign: 'center', background: 'rgba(239, 68, 68, 0.08)', padding: '0.5rem', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.15)' }}>

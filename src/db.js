@@ -453,10 +453,30 @@ export async function getProfessors() {
       const list = [];
       snap.forEach(docSnap => {
         const p = docSnap.data();
+        let sanitizedName = p.name || '';
+        let needsUpdate = false;
+        if (sanitizedName.startsWith("Dr. Dr. ")) {
+          sanitizedName = sanitizedName.substring(4);
+          needsUpdate = true;
+        } else if (sanitizedName.startsWith("Dr. Mr. ")) {
+          sanitizedName = sanitizedName.substring(4);
+          needsUpdate = true;
+        } else if (sanitizedName.startsWith("Dr. Mrs. ")) {
+          sanitizedName = sanitizedName.substring(4);
+          needsUpdate = true;
+        }
+
+        if (needsUpdate) {
+          const docRef = doc(db, 'professors', p.id);
+          setDoc(docRef, { ...p, name: sanitizedName }, { merge: true }).catch(err => {
+            console.error("Failed to sanitize duplicate prefix for professor:", p.id, err);
+          });
+        }
+
         const assignedSubjects = subjectsList.filter(s => (p.subjectIds || []).includes(s.id));
         list.push({
           id: p.id,
-          name: p.name,
+          name: sanitizedName,
           loginId: p.loginId,
           password: p.password,
           department: p.department,

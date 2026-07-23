@@ -276,7 +276,15 @@ export default function App() {
   const [rescheduleDate, setRescheduleDate] = useState(getTodayDate());
   const [rescheduleStartTime, setRescheduleStartTime] = useState('09:00');
   const [rescheduleEndTime, setRescheduleEndTime] = useState('10:00');
+  // Derived filtered subjects and professors for the routine builder
+  const filteredTheorySubjects = subjects.filter(s => s.department === theoryDept && s.type === 'Theory');
+  const filteredTheoryProfs = professors.filter(p => p.department === theoryDept && p.subjects.some(sub => sub.id === (theorySubjectId || (filteredTheorySubjects[0]?.id))));
 
+  const filteredPracSubjectsA = subjects.filter(s => s.department === pracDeptA && s.type === 'Practical');
+  const filteredPracProfsA = professors.filter(p => p.department === pracDeptA && p.subjects.some(sub => sub.id === (pracSubjectIdA || (filteredPracSubjectsA[0]?.id))));
+
+  const filteredPracSubjectsB = subjects.filter(s => s.department === pracDeptB && s.type === 'Practical');
+  const filteredPracProfsB = professors.filter(p => p.department === pracDeptB && p.subjects.some(sub => sub.id === (pracSubjectIdB || (filteredPracSubjectsB[0]?.id))));
   // Load all system data on mount and subscribe to realtime updates
   useEffect(() => {
     loadAllData();
@@ -832,7 +840,7 @@ export default function App() {
             subjectName: subjectInfo.subjectName,
             periodTime: `${minutesToDisplay(timeToMinutes(nextPeriod.startTime))} – ${minutesToDisplay(timeToMinutes(nextPeriod.endTime))}`,
             entryTime: formatTime(nowISO),
-            professors: subjectInfo.professors?.map(p => `Dr. ${p.name}`).join(', ')
+            professors: subjectInfo.professors?.map(p => p.name).join(', ')
           };
         }
 
@@ -937,7 +945,7 @@ export default function App() {
         periodTime: `${minutesToDisplay(timeToMinutes(currentPeriod.startTime))} – ${minutesToDisplay(timeToMinutes(currentPeriod.endTime))}`,
         exitOpenTime: minutesToDisplay(timeToMinutes(currentPeriod.endTime) - 5),
         entryTime: formatTime(nowISO),
-        professors: subInfo.professors?.map(p => `Dr. ${p.name}`).join(', '),
+        professors: subInfo.professors?.map(p => p.name).join(', '),
         type_label: subInfo.type,
         dept: subInfo.dept
       };
@@ -2065,7 +2073,7 @@ export default function App() {
             setProfFilterGroup('all');
             setSelectedProfStudent(null);
             setProfAllAttendanceLogs(await getAllAttendanceLogs());
-            triggerToast(`Logged in successfully as Dr. ${authResult.professor.name}!`, 'success');
+            triggerToast(`Logged in successfully as ${authResult.professor.name}!`, 'success');
             setCurrentPage('professor_dashboard');
             closeLoginModal();
           } else {
@@ -2368,7 +2376,7 @@ export default function App() {
     setProfessorPasswordInput(prof.password);
     setProfessorDeptInput(prof.department);
     setProfessorSubjectsInput(prof.subjects.map(s => s.id));
-    triggerToast(`Loaded professor "Dr. ${prof.name}" for editing.`, 'success');
+    triggerToast(`Loaded professor "${prof.name}" for editing.`, 'success');
   };
 
   const handleDeleteProfessor = async (profId, name) => {
@@ -2405,17 +2413,26 @@ export default function App() {
     };
 
     if (periodType === 'Theory') {
-      if (!theorySubjectId) {
+      let finalSubId = theorySubjectId;
+      if (!finalSubId && filteredTheorySubjects.length > 0) {
+        finalSubId = filteredTheorySubjects[0].id;
+      }
+      let finalProfId = theoryProf1;
+      if (!finalProfId && filteredTheoryProfs.length > 0) {
+        finalProfId = filteredTheoryProfs[0].id;
+      }
+
+      if (!finalSubId) {
         triggerToast('Please select a subject for this theory class.', 'error');
         return;
       }
-      if (!theoryProf1) {
+      if (!finalProfId) {
         triggerToast('Please select a professor for this theory class.', 'error');
         return;
       }
       
-      const sub = subjects.find(s => s.id === theorySubjectId);
-      const prof1 = professors.find(p => p.id === theoryProf1);
+      const sub = subjects.find(s => s.id === finalSubId);
+      const prof1 = professors.find(p => p.id === finalProfId);
       const prof2 = professors.find(p => p.id === theoryProf2);
 
       if (!sub || !prof1) {
@@ -2426,7 +2443,7 @@ export default function App() {
       periodItem = {
         ...periodItem,
         dept: theoryDept,
-        subjectId: theorySubjectId,
+        subjectId: finalSubId,
         subjectName: sub.name,
         professors: [
           { id: prof1.id, name: prof1.name },
@@ -2435,21 +2452,39 @@ export default function App() {
       };
     } else {
       // Practical
-      if (!pracSubjectIdA || !pracProf1A) {
+      let finalSubIdA = pracSubjectIdA;
+      if (!finalSubIdA && filteredPracSubjectsA.length > 0) {
+        finalSubIdA = filteredPracSubjectsA[0].id;
+      }
+      let finalProfIdA = pracProf1A;
+      if (!finalProfIdA && filteredPracProfsA.length > 0) {
+        finalProfIdA = filteredPracProfsA[0].id;
+      }
+
+      let finalSubIdB = pracSubjectIdB;
+      if (!finalSubIdB && filteredPracSubjectsB.length > 0) {
+        finalSubIdB = filteredPracSubjectsB[0].id;
+      }
+      let finalProfIdB = pracProf1B;
+      if (!finalProfIdB && filteredPracProfsB.length > 0) {
+        finalProfIdB = filteredPracProfsB[0].id;
+      }
+
+      if (!finalSubIdA || !finalProfIdA) {
         triggerToast('Please select subject and professor for Group A.', 'error');
         return;
       }
-      if (!pracSubjectIdB || !pracProf1B) {
+      if (!finalSubIdB || !finalProfIdB) {
         triggerToast('Please select subject and professor for Group B.', 'error');
         return;
       }
 
-      const subA = subjects.find(s => s.id === pracSubjectIdA);
-      const prof1A = professors.find(p => p.id === pracProf1A);
+      const subA = subjects.find(s => s.id === finalSubIdA);
+      const prof1A = professors.find(p => p.id === finalProfIdA);
       const prof2A = professors.find(p => p.id === pracProf2A);
 
-      const subB = subjects.find(s => s.id === pracSubjectIdB);
-      const prof1B = professors.find(p => p.id === pracProf1B);
+      const subB = subjects.find(s => s.id === finalSubIdB);
+      const prof1B = professors.find(p => p.id === finalProfIdB);
       const prof2B = professors.find(p => p.id === pracProf2B);
 
       if (!subA || !prof1A || !subB || !prof1B) {
@@ -2461,7 +2496,7 @@ export default function App() {
         ...periodItem,
         groupA: {
           dept: pracDeptA,
-          subjectId: pracSubjectIdA,
+          subjectId: finalSubIdA,
           subjectName: subA.name,
           professors: [
             { id: prof1A.id, name: prof1A.name },
@@ -2470,7 +2505,7 @@ export default function App() {
         },
         groupB: {
           dept: pracDeptB,
-          subjectId: pracSubjectIdB,
+          subjectId: finalSubIdB,
           subjectName: subB.name,
           professors: [
             { id: prof1B.id, name: prof1B.name },
@@ -2587,15 +2622,6 @@ export default function App() {
 
   if (currentPage === 'admin') {
     const totalStudentsCount = classes.reduce((sum, c) => sum + c.students.length, 0);
-
-    const filteredTheorySubjects = subjects.filter(s => s.department === theoryDept && s.type === 'Theory');
-    const filteredTheoryProfs = professors.filter(p => p.department === theoryDept && p.subjects.some(sub => sub.id === theorySubjectId));
-
-    const filteredPracSubjectsA = subjects.filter(s => s.department === pracDeptA && s.type === 'Practical');
-    const filteredPracProfsA = professors.filter(p => p.department === pracDeptA && p.subjects.some(sub => sub.id === pracSubjectIdA));
-
-    const filteredPracSubjectsB = subjects.filter(s => s.department === pracDeptB && s.type === 'Practical');
-    const filteredPracProfsB = professors.filter(p => p.department === pracDeptB && p.subjects.some(sub => sub.id === pracSubjectIdB));
 
     return (
       <div className="admin-dashboard-container animate-fade-in">
@@ -3009,7 +3035,7 @@ export default function App() {
                                 onChange={(e) => setTheoryProf1(e.target.value)}
                               >
                                 {filteredTheoryProfs.map(p => (
-                                  <option key={p.id} value={p.id}>Dr. {p.name}</option>
+                                  <option key={p.id} value={p.id}>{p.name}</option>
                                 ))}
                                 {filteredTheoryProfs.length === 0 && (
                                   <option value="">No matching teacher in list</option>
@@ -3026,7 +3052,7 @@ export default function App() {
                               >
                                 <option value="">-- None (Single Teacher) --</option>
                                 {filteredTheoryProfs.map(p => (
-                                  <option key={p.id} value={p.id}>Dr. {p.name}</option>
+                                  <option key={p.id} value={p.id}>{p.name}</option>
                                 ))}
                               </select>
                             </div>
@@ -3079,7 +3105,7 @@ export default function App() {
                                 onChange={(e) => setPracProf1A(e.target.value)}
                               >
                                 {filteredPracProfsA.map(p => (
-                                  <option key={p.id} value={p.id}>Dr. {p.name}</option>
+                                  <option key={p.id} value={p.id}>{p.name}</option>
                                 ))}
                                 {filteredPracProfsA.length === 0 && (
                                   <option value="">No matching teacher in list</option>
@@ -3096,7 +3122,7 @@ export default function App() {
                               >
                                 <option value="">-- None --</option>
                                 {filteredPracProfsA.map(p => (
-                                  <option key={p.id} value={p.id}>Dr. {p.name}</option>
+                                  <option key={p.id} value={p.id}>{p.name}</option>
                                 ))}
                               </select>
                             </div>
@@ -3144,7 +3170,7 @@ export default function App() {
                                 onChange={(e) => setPracProf1B(e.target.value)}
                               >
                                 {filteredPracProfsB.map(p => (
-                                  <option key={p.id} value={p.id}>Dr. {p.name}</option>
+                                  <option key={p.id} value={p.id}>{p.name}</option>
                                 ))}
                                 {filteredPracProfsB.length === 0 && (
                                   <option value="">No matching teacher in list</option>
@@ -3161,7 +3187,7 @@ export default function App() {
                               >
                                 <option value="">-- None --</option>
                                 {filteredPracProfsB.map(p => (
-                                  <option key={p.id} value={p.id}>Dr. {p.name}</option>
+                                  <option key={p.id} value={p.id}>{p.name}</option>
                                 ))}
                               </select>
                             </div>
@@ -3226,7 +3252,7 @@ export default function App() {
                                         </div>
                                         <div className="timetable-card-professors" style={{ marginTop: '0.35rem' }}>
                                           <span style={{ opacity: 0.6 }}>👨‍🏫</span>
-                                          <span>{p.professors.map(prof => `Dr. ${prof.name}`).join(' + ')}</span>
+                                          <span>{p.professors.map(prof => prof.name).join(' + ')}</span>
                                         </div>
                                       </div>
                                     ) : (
@@ -3236,7 +3262,7 @@ export default function App() {
                                           <div className="timetable-group-label-pill">Grp A</div>
                                           <div className="timetable-card-subject-title" style={{ fontSize: '0.85rem' }}>{p.groupA.subjectName}</div>
                                           <div className="timetable-card-professors" style={{ fontSize: '0.72rem' }}>
-                                            <span>{p.groupA.professors.map(prof => `Dr. ${prof.name}`).join(' + ')}</span>
+                                            <span>{p.groupA.professors.map(prof => prof.name).join(' + ')}</span>
                                           </div>
                                         </div>
                                         {/* Group B half */}
@@ -3244,7 +3270,7 @@ export default function App() {
                                           <div className="timetable-group-label-pill">Grp B</div>
                                           <div className="timetable-card-subject-title" style={{ fontSize: '0.85rem' }}>{p.groupB.subjectName}</div>
                                           <div className="timetable-card-professors" style={{ fontSize: '0.72rem' }}>
-                                            <span>{p.groupB.professors.map(prof => `Dr. ${prof.name}`).join(' + ')}</span>
+                                            <span>{p.groupB.professors.map(prof => prof.name).join(' + ')}</span>
                                           </div>
                                         </div>
                                       </div>
@@ -3577,7 +3603,7 @@ export default function App() {
                         <div key={prof.id} className="published-class-item" style={{ padding: '1rem 1.25rem', flexDirection: 'column', alignItems: 'stretch', gap: '0.85rem' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
                             <div className="class-item-details">
-                              <span className="class-item-title" style={{ fontSize: '1.05rem' }}>Dr. {prof.name}</span>
+                              <span className="class-item-title" style={{ fontSize: '1.05rem' }}>{prof.name}</span>
                               <span className={`dept-tag ${deptClass}`} style={{ marginTop: '0.2rem', alignSelf: 'flex-start' }}>{prof.department}</span>
                               <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '0.35rem' }}>
                                 <span>User: <strong style={{ color: 'var(--text)' }}>{prof.loginId}</strong></span>
@@ -4599,7 +4625,7 @@ export default function App() {
                               <div className="schedule-subject">{subInfo?.subjectName || period.type}</div>
                               <div className="schedule-meta">
                                 <span className={`sub-badge ${period.type.toLowerCase()}`} style={{ fontSize: '0.62rem' }}>{period.type}</span>
-                                {subInfo?.professors && <span className="schedule-prof">👨‍🏫 {subInfo.professors.map(p => `Dr. ${p.name}`).join(', ')}</span>}
+                                {subInfo?.professors && <span className="schedule-prof">👨‍🏫 {subInfo.professors.map(p => p.name).join(', ')}</span>}
                               </div>
                             </div>
                             <div className="schedule-status-col">
@@ -4827,7 +4853,7 @@ export default function App() {
                   {profData.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="student-avatar-info">
-                  <span className="student-avatar-name">Dr. {profData.name}</span>
+                  <span className="student-avatar-name">{profData.name}</span>
                   <span className="student-avatar-meta">{profData.department}</span>
                 </div>
               </div>
@@ -5411,7 +5437,6 @@ export default function App() {
                   <span className="checkbox-box"></span>
                   <span>Remember me</span>
                 </label>
-                <a href="#" className="forgot-link" onClick={(e) => { e.preventDefault(); triggerToast('Password reset link sent! Check your email.', 'success'); }}>Forgot password?</a>
               </div>
 
               <button

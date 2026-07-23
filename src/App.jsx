@@ -10,6 +10,139 @@ import { drawStylishQR } from './qrHelper';
 import { Html5Qrcode } from 'html5-qrcode';
 
 // ===================================================
+// SMART SVG ICONS UTILITY COMPONENT
+// ===================================================
+const SmartIcon = ({ name, style, size = 18, color = 'currentColor' }) => {
+  const icons = {
+    gear: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+      </svg>
+    ),
+    camera: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+        <circle cx="12" cy="13" r="4" />
+      </svg>
+    ),
+    trash: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+        <polyline points="3 6 5 6 21 6" />
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+        <line x1="10" y1="11" x2="10" y2="17" />
+        <line x1="14" y1="11" x2="14" y2="17" />
+      </svg>
+    ),
+    pencil: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+      </svg>
+    ),
+    mappin: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+        <circle cx="12" cy="10" r="3" />
+      </svg>
+    ),
+    user: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+        <circle cx="12" cy="7" r="4" />
+      </svg>
+    ),
+    calendar: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+        <line x1="16" y1="2" x2="16" y2="6" />
+        <line x1="8" y1="2" x2="8" y2="6" />
+        <line x1="3" y1="10" x2="21" y2="10" />
+      </svg>
+    ),
+    teacher: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+      </svg>
+    ),
+    hourglass: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+        <path d="M5 2h14" />
+        <path d="M5 22h14" />
+        <path d="M19 2v4c0 1.38-1.13 2.5-2.5 2.5S14 7.38 14 6V2" />
+        <path d="M12 12c-2.21 0-4-1.79-4-4V2h8v6c0 2.21-1.79 4-4 4z" />
+        <path d="M12 12c2.21 0 4 1.79 4 4v6H8v-6c0-2.21 1.79-4 4-4z" />
+      </svg>
+    ),
+    check: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" style={style}>
+        <polyline points="20 6 9 17 4 12" />
+      </svg>
+    ),
+    cross: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" style={style}>
+        <line x1="18" y1="6" x2="6" y2="18" />
+        <line x1="6" y1="6" x2="18" y2="18" />
+      </svg>
+    ),
+    rocket: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+        <path d="M4.5 16.5c-1.5 1.26-2 2.5-2 2.5s1.24-.5 2.5-2Z" />
+        <path d="M15 9l-9 9" />
+        <path d="M9 15l-3-3a1.5 1.5 0 0 1 0-2.12L15 3h6v6l-7 9a1.5 1.5 0 0 1-2.12 0l-3-3Z" />
+      </svg>
+    ),
+    warning: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+        <line x1="12" y1="9" x2="12" y2="13" />
+        <line x1="12" y1="17" x2="12.01" y2="17" />
+      </svg>
+    ),
+    banned: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+        <circle cx="12" cy="12" r="10" />
+        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+      </svg>
+    ),
+    graduation: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+        <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+        <path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5" />
+      </svg>
+    ),
+    lock: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+      </svg>
+    )
+  };
+
+  let iconKey = name;
+  if (name === '⚙️') iconKey = 'gear';
+  else if (name === '📷') iconKey = 'camera';
+  else if (name === '🗑️') iconKey = 'trash';
+  else if (name === '✏️') iconKey = 'pencil';
+  else if (name === '📍') iconKey = 'mappin';
+  else if (name === '👤') iconKey = 'user';
+  else if (name === '🗓️') iconKey = 'calendar';
+  else if (name === '📅') iconKey = 'calendar';
+  else if (name === '👨‍🏫') iconKey = 'teacher';
+  else if (name === '⏳') iconKey = 'hourglass';
+  else if (name === '✅') iconKey = 'check';
+  else if (name === '❌') iconKey = 'cross';
+  else if (name === '🚀') iconKey = 'rocket';
+  else if (name === '⚠️') iconKey = 'warning';
+  else if (name === '🚫') iconKey = 'banned';
+  else if (name === '🎓') iconKey = 'graduation';
+  else if (name === '🔐' || name === '🔒') iconKey = 'lock';
+
+  return icons[iconKey] || <span>{name}</span>;
+};
+
+// ===================================================
 // PURE UTILITY HELPER FUNCTIONS
 // ===================================================
 
@@ -1539,11 +1672,11 @@ export default function App() {
                             {statusText}
                           </span>
                         </div>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text)', margin: 0 }}>
-                          🗓️ {period.day}s · {period.startTime} - {period.endTime} ({period.type})
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <SmartIcon name="calendar" size={13} /> {period.day}s · {period.startTime} - {period.endTime} ({period.type})
                         </p>
-                        <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', margin: '0.2rem 0 0 0' }}>
-                          👤 Assigned: {period.type === 'Theory' 
+                        <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', margin: '0.2rem 0 0 0', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <SmartIcon name="user" size={12} /> Assigned: {period.type === 'Theory' 
                             ? period.professors?.map(pr => pr.name).join(', ') 
                             : `A: ${period.groupA?.professors?.map(p=>p.name).join(', ')} | B: ${period.groupB?.professors?.map(p=>p.name).join(', ')}`}
                         </p>
@@ -1551,8 +1684,8 @@ export default function App() {
 
                       {isAssigned && (
                         <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '0.5rem' }}>
-                          {adj ? (
-                            <button className="btn-secondary" style={{ flex: 1, padding: '0.3rem 0.5rem', fontSize: '0.75rem', color: 'var(--error)' }}
+                           {adj ? (
+                            <button className="btn-secondary" style={{ flex: 1, padding: '0.3rem 0.5rem', fontSize: '0.75rem', color: 'var(--error)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
                               onClick={async () => {
                                 if (window.confirm('Delete adjustment and restore normal routine period?')) {
                                   await deleteAdjustment(adj.id, currentClass.id);
@@ -1561,15 +1694,15 @@ export default function App() {
                                   triggerToast('Adjustment deleted and class schedule restored!', 'success');
                                 }
                               }}>
-                              🗑️ Clear Adjustment
+                              <SmartIcon name="trash" size={13} /> Clear Adjustment
                             </button>
                           ) : (
-                            <button className="btn-primary" style={{ flex: 1, padding: '0.35rem 0.5rem', fontSize: '0.75rem', background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.3)', color: 'var(--primary-light)', boxShadow: 'none' }}
+                            <button className="btn-primary" style={{ flex: 1, padding: '0.35rem 0.5rem', fontSize: '0.75rem', background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.3)', color: 'var(--primary-light)', boxShadow: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
                               onClick={() => {
                                 setAdjustmentModalPeriod(period);
                                 setAdjustmentType('cancelled');
                               }}>
-                              ⚙️ Adjust Schedule
+                              <SmartIcon name="gear" size={13} /> Adjust Schedule
                             </button>
                           )}
                         </div>
@@ -1674,7 +1807,9 @@ export default function App() {
 
           {sessionsList.length === 0 ? (
             <div className="analytics-empty-state">
-              <span style={{ fontSize: '2rem' }}>📅</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.5rem', color: 'var(--text-dim)' }}>
+                <SmartIcon name="calendar" size={32} color="var(--text-dim)" />
+              </span>
               <p>No lectures have been logged for this subject yet.</p>
             </div>
           ) : (
@@ -1766,7 +1901,7 @@ export default function App() {
           
           <div className="modal-header-row" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
             <span className="logo-text" style={{ fontSize: '1.1rem', fontWeight: '900', color: 'var(--primary-light)' }}>
-              ⚙️ Adjust Timetable Slot
+              <SmartIcon name="gear" size={18} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> Adjust Timetable Slot
             </span>
             <button 
               type="button" 
@@ -1810,8 +1945,8 @@ export default function App() {
                 value={adjustmentType} 
                 onChange={(e) => setAdjustmentType(e.target.value)}
               >
-                <option value="cancelled">🚫 Cancel Class for this Date</option>
-                <option value="rescheduled">🔁 Reschedule Class to a New Slot</option>
+                <option value="cancelled">Cancel Class for this Date</option>
+                <option value="rescheduled">Reschedule Class to a New Slot</option>
               </select>
             </div>
 
@@ -2099,14 +2234,14 @@ export default function App() {
                           {log.exitTime && log.status === 'present' ? 'Present' : 'Stale/Incomplete'}
                         </span>
                       </td>
-                      <td style={{ padding: '0.5rem 0.5rem', display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                        <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem', padding: 0 }}
+                      <td style={{ padding: '0.5rem 0.5rem', display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                        <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', padding: 0 }}
                           title="Edit log details" onClick={() => handleStartEditLog(log)}>
-                          ✏️
+                          <SmartIcon name="pencil" size={13} />
                         </button>
-                        <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem', padding: 0 }}
+                        <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--error)', padding: 0 }}
                           title="Delete log details" onClick={() => handleDeleteLog(log.id, selectedProfStudent.id, currentClass.id, currentSub)}>
-                          🗑️
+                          <SmartIcon name="trash" size={13} color="var(--error)" />
                         </button>
                       </td>
                     </tr>
@@ -2134,7 +2269,11 @@ export default function App() {
                   flex: 1, 
                   background: 'linear-gradient(135deg, #ef4444, #b91c1c)', 
                   border: 'none',
-                  boxShadow: 'none'
+                  boxShadow: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.4rem'
                 }} 
                 onClick={async () => {
                   if (window.confirm(`Are you absolutely sure you want to permanently DELETE ALL attendance logs for ${selectedProfStudent.name}? This action CANNOT be undone!`)) {
@@ -2142,7 +2281,7 @@ export default function App() {
                   }
                 }}
               >
-                🗑️ Clear All Logs
+                <SmartIcon name="trash" size={14} color="#ffffff" /> Clear All Logs
               </button>
             )}
           </div>
@@ -3379,7 +3518,7 @@ export default function App() {
                                           <span className="dept-tag it" style={{ fontSize: '0.62rem', padding: '0.1rem 0.35rem' }}>{p.dept.split(' ')[0]}</span>
                                         </div>
                                         <div className="timetable-card-professors" style={{ marginTop: '0.35rem' }}>
-                                          <span style={{ opacity: 0.6 }}>👨‍🏫</span>
+                                          <SmartIcon name="teacher" size={13} style={{ marginRight: '4px', opacity: 0.6 }} />
                                           <span>{p.professors.map(prof => prof.name).join(' + ')}</span>
                                         </div>
                                       </div>
@@ -4005,8 +4144,10 @@ export default function App() {
         
         {toast && (
           <div className="toast-container">
-            <div className={`toast toast-${toast.type}`}>
-              <span className="toast-icon">{toast.type === 'success' ? '✅' : '❌'}</span>
+            <div className={`toast toast-${toast.type}`} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span className="toast-icon" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                {toast.type === 'success' ? <SmartIcon name="check" size={13} color="#10b981" /> : <SmartIcon name="cross" size={13} color="#ef4444" />}
+              </span>
               <span>{toast.message}</span>
             </div>
           </div>
@@ -4202,7 +4343,7 @@ export default function App() {
                     id="scanQRBtn"
                     style={{ width: '100%', padding: '0.85rem 1rem', fontSize: '0.95rem' }}
                   >
-                    📷 Scan Attendance QR
+                    <SmartIcon name="camera" size={15} style={{ marginRight: '5px', verticalAlign: 'middle' }} /> Scan Attendance QR
                   </button>
 
                   {/* CAMERA OVERLAY POPUP MODAL */}
@@ -4210,8 +4351,8 @@ export default function App() {
                     <div className="modal-overlay open" style={{ zIndex: 1200 }}>
                       <div className="modal card animate-scale-up" style={{ maxWidth: '450px', padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                         <div className="modal-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
-                          <span className="logo-text" style={{ fontSize: '1.05rem', fontWeight: '900', color: 'var(--primary-light)' }}>
-                            📷 Camera QR Scanner
+                          <span className="logo-text" style={{ fontSize: '1.05rem', fontWeight: '900', color: 'var(--primary-light)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <SmartIcon name="camera" size={18} /> Camera QR Scanner
                           </span>
                           <button 
                             type="button" 
@@ -4225,8 +4366,9 @@ export default function App() {
 
                         {geoChecking ? (
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem', gap: '1rem', minHeight: '200px', textAlign: 'center' }}>
-                            <span className="spinner-mini" style={{ width: '40px', height: '40px', border: '3px solid var(--primary-light)', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.6s linear infinite' }} />
-                            <span style={{ fontSize: '0.9rem', color: 'var(--text)', fontWeight: 600 }}>📍 GCECT Geofence Lock</span>
+                                                        <span style={{ fontSize: '0.9rem', color: 'var(--text)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <SmartIcon name="mappin" size={16} /> GCECT Geofence Lock
+                            </span>
                             <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>
                               Verifying physical location... Please allow device GPS location permissions when prompted by your browser.
                             </span>
@@ -4260,16 +4402,16 @@ export default function App() {
                               justifyContent: 'center',
                               gap: '0.4rem'
                             }}>
-                              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-light)' }}>
-                                📍 GCECT Campus Location Verified (Active)
+                              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-light)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                <SmartIcon name="mappin" size={14} /> GCECT Campus Location Verified (Active)
                               </span>
                             </div>
                           </>
                         )}
 
                         {scannerError && (
-                          <div style={{ color: '#ef4444', fontSize: '0.72rem', textAlign: 'center', background: 'rgba(239, 68, 68, 0.08)', padding: '0.5rem', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
-                            ⚠️ {scannerError}
+                          <div style={{ color: '#ef4444', fontSize: '0.72rem', textAlign: 'center', background: 'rgba(239, 68, 68, 0.08)', padding: '0.5rem', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}>
+                            <SmartIcon name="warning" size={13} color="#ef4444" /> {scannerError}
                           </div>
                         )}
 
@@ -4291,7 +4433,9 @@ export default function App() {
                   {/* EXIT SUCCESS */}
                   {scanState.type === 'exit_success' && (
                     <div className="scan-result-card success">
-                      <div className="scan-result-icon success-icon">✅</div>
+                      <div className="scan-result-icon success-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <SmartIcon name="check" size={24} color="#10b981" />
+                      </div>
                       <h2 className="scan-result-title">{scanState.title}</h2>
                       <p className="scan-result-message">{scanState.message}</p>
                       <div className="scan-result-details-grid">
@@ -4316,7 +4460,9 @@ export default function App() {
                           <span className="scan-detail-value accent-text">{scanState.duration}</span>
                         </div>
                       </div>
-                      <div className="scan-confetti-badge">🎓 Attendance Marked — Present</div>
+                      <div className="scan-confetti-badge" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}>
+                        <SmartIcon name="graduation" size={14} /> Attendance Marked — Present
+                      </div>
                       <button className="btn-primary" style={{ width: '100%', marginTop: '1rem' }} onClick={handleScanAgain}>
                         Done
                       </button>
@@ -4327,12 +4473,14 @@ export default function App() {
                   {scanState.type === 'entry_success' && (
                     <div className="scan-result-card entry">
                       {scanState.latePrevMessage && (
-                        <div className="late-warning-banner">
-                          <span>⚠️</span>
+                        <div className="late-warning-banner" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <SmartIcon name="warning" size={14} color="#f59e0b" />
                           <span>{scanState.latePrevMessage}</span>
                         </div>
                       )}
-                      <div className="scan-result-icon entry-icon">🚀</div>
+                      <div className="scan-result-icon entry-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <SmartIcon name="rocket" size={24} color="#3b82f6" />
+                      </div>
                       <h2 className="scan-result-title">Entry Recorded!</h2>
                       <p className="scan-result-message">You've entered the classroom. Don't forget to scan again when the class ends!</p>
                       <div className="scan-result-details-grid">
@@ -4359,8 +4507,8 @@ export default function App() {
                           <span className="scan-detail-value accent-text">{scanState.exitOpenTime}</span>
                         </div>
                       </div>
-                      <div className="exit-reminder-pill">
-                        ⏰ Scan again after {scanState.exitOpenTime} to confirm attendance
+                      <div className="exit-reminder-pill" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}>
+                        <SmartIcon name="hourglass" size={13} /> Scan again after {scanState.exitOpenTime} to confirm attendance
                       </div>
                       <button className="btn-secondary" style={{ width: '100%', marginTop: '1rem' }} onClick={handleScanAgain}>
                         Back to Dashboard
@@ -4371,7 +4519,9 @@ export default function App() {
                   {/* EARLY ENTRY */}
                   {scanState.type === 'entry_early' && (
                     <div className="scan-result-card entry">
-                      <div className="scan-result-icon" style={{ background: 'rgba(251,191,36,0.15)', color: '#f59e0b' }}>🕐</div>
+                      <div className="scan-result-icon" style={{ background: 'rgba(251,191,36,0.15)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <SmartIcon name="hourglass" size={24} color="#f59e0b" />
+                      </div>
                       <h2 className="scan-result-title">{scanState.title}</h2>
                       <p className="scan-result-message">{scanState.message}</p>
                       <div className="scan-result-details-grid">
@@ -4398,7 +4548,9 @@ export default function App() {
                   {/* TOO EARLY TO EXIT */}
                   {scanState.type === 'too_early_exit' && (
                     <div className="scan-result-card warning">
-                      <div className="scan-result-icon warning-icon">⏳</div>
+                      <div className="scan-result-icon warning-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <SmartIcon name="hourglass" size={24} color="#f59e0b" />
+                      </div>
                       <h2 className="scan-result-title">{scanState.title}</h2>
                       <p className="scan-result-message">{scanState.message}</p>
                       <div className="scan-result-details-grid">
@@ -4425,7 +4577,9 @@ export default function App() {
                   {/* NO CLASS NOW */}
                   {(scanState.type === 'no_class_now' || scanState.type === 'no_class_today') && (
                     <div className="scan-result-card neutral">
-                      <div className="scan-result-icon neutral-icon">{scanState.icon}</div>
+                      <div className="scan-result-icon neutral-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <SmartIcon name={scanState.icon} size={24} color="var(--primary-light)" />
+                      </div>
                       <h2 className="scan-result-title">{scanState.title}</h2>
                       <p className="scan-result-message">{scanState.message}</p>
                       {scanState.subMessage && (
@@ -4440,7 +4594,9 @@ export default function App() {
                   {/* BLOCKED — exit previous class first */}
                   {(scanState.type === 'blocked_exit_pending') && (
                     <div className="scan-result-card warning">
-                      <div className="scan-result-icon warning-icon">⚠️</div>
+                      <div className="scan-result-icon warning-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <SmartIcon name="warning" size={24} color="#f59e0b" />
+                      </div>
                       <h2 className="scan-result-title">{scanState.title}</h2>
                       <p className="scan-result-message">{scanState.message}</p>
                       {scanState.subMessage && (
@@ -4455,7 +4611,9 @@ export default function App() {
                   {/* BLOCKED — stale previous-day entry */}
                   {scanState.type === 'blocked' && (
                     <div className="scan-result-card error">
-                      <div className="scan-result-icon error-icon">🚫</div>
+                      <div className="scan-result-icon error-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <SmartIcon name="banned" size={24} color="#ef4444" />
+                      </div>
                       <h2 className="scan-result-title">{scanState.title}</h2>
                       <p className="scan-result-message">{scanState.message}</p>
                       <p className="scan-result-message" style={{ fontSize: '0.82rem', color: 'var(--text-dim)' }}>{scanState.subMessage}</p>
@@ -4472,7 +4630,9 @@ export default function App() {
                   {/* LATE ENTRY IN EXIT WINDOW */}
                   {scanState.type === 'entry_late_exit_window' && (
                     <div className="scan-result-card warning">
-                      <div className="scan-result-icon warning-icon">⚠️</div>
+                      <div className="scan-result-icon warning-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <SmartIcon name="warning" size={24} color="#f59e0b" />
+                      </div>
                       <h2 className="scan-result-title">{scanState.title}</h2>
                       <p className="scan-result-message">{scanState.message}</p>
                       <p className="scan-result-message" style={{ color: '#f59e0b', fontSize: '0.9rem', fontWeight: '700' }}>{scanState.subMessage}</p>
@@ -4485,7 +4645,9 @@ export default function App() {
                   {/* GEOLOCATION ERROR */}
                   {scanState.type === 'geo_error' && (
                     <div className="scan-result-card error">
-                      <div className="scan-result-icon error-icon" style={{ background: 'rgba(239, 68, 68, 0.15)', color: 'var(--error)' }}>{scanState.icon}</div>
+                      <div className="scan-result-icon error-icon" style={{ background: 'rgba(239, 68, 68, 0.15)', color: 'var(--error)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <SmartIcon name={scanState.icon} size={24} color="var(--error)" />
+                      </div>
                       <h2 className="scan-result-title">{scanState.title}</h2>
                       <p className="scan-result-message">{scanState.message}</p>
                       <p className="scan-result-message" style={{ fontSize: '0.82rem', color: 'var(--text-dim)', marginTop: '0.5rem' }}>{scanState.subMessage}</p>
@@ -4498,7 +4660,9 @@ export default function App() {
                   {/* ERROR */}
                   {scanState.type === 'error' && (
                     <div className="scan-result-card error">
-                      <div className="scan-result-icon error-icon">❌</div>
+                      <div className="scan-result-icon error-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <SmartIcon name="cross" size={24} color="#ef4444" />
+                      </div>
                       <h2 className="scan-result-title">Scan Failed</h2>
                       <p className="scan-result-message">{scanState.message}</p>
                       <button className="btn-secondary" style={{ width: '100%', marginTop: '1rem' }} onClick={handleScanAgain}>
@@ -4522,8 +4686,14 @@ export default function App() {
                           {log.exitTime ? ` · Exit: ${formatTime(log.exitTime)}` : ' · Exit: pending'}
                         </div>
                       </div>
-                      <div className={`session-status-badge ${log.status}`}>
-                        {log.status === 'present' ? '✓ Present' : log.status === 'pending' ? '⏳ Active' : '✗ Absent'}
+                      <div className={`session-status-badge ${log.status}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                        {log.status === 'present' ? (
+                          <><SmartIcon name="check" size={10} /> Present</>
+                        ) : log.status === 'pending' ? (
+                          <><SmartIcon name="hourglass" size={10} /> Active</>
+                        ) : (
+                          <><SmartIcon name="cross" size={10} /> Absent</>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -4764,18 +4934,30 @@ export default function App() {
                             </div>
                             <div className="schedule-info-col">
                               <div className="schedule-subject">{subInfo?.subjectName || period.type}</div>
-                              <div className="schedule-meta">
+                              <div className="schedule-meta" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                                 <span className={`sub-badge ${period.type.toLowerCase()}`} style={{ fontSize: '0.62rem' }}>{period.type}</span>
-                                {subInfo?.professors && <span className="schedule-prof">👨‍🏫 {subInfo.professors.map(p => p.name).join(', ')}</span>}
+                                {subInfo?.professors && (
+                                  <span className="schedule-prof" style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                                    <SmartIcon name="teacher" size={11} /> {subInfo.professors.map(p => p.name).join(', ')}
+                                  </span>
+                                )}
                               </div>
                             </div>
                             <div className="schedule-status-col">
                               {periodLog ? (
-                                <span className={`session-status-badge ${periodLog.status}`}>
-                                  {periodLog.status === 'present' ? '✓ Done' : periodLog.status === 'pending' ? '⏳ Active' : '✗'}
+                                <span className={`session-status-badge ${periodLog.status}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                                  {periodLog.status === 'present' ? (
+                                    <><SmartIcon name="check" size={11} /> Conducted</>
+                                  ) : periodLog.status === 'pending' ? (
+                                    <><SmartIcon name="hourglass" size={11} /> Active</>
+                                  ) : (
+                                    <><SmartIcon name="cross" size={11} /> Absent</>
+                                  )}
                                 </span>
                               ) : isPast ? (
-                                <span className="session-status-badge absent_no_exit">✗ Missed</span>
+                                <span className="session-status-badge absent_no_exit" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                                  <SmartIcon name="cross" size={11} /> Missed
+                                </span>
                               ) : isActive ? (
                                 <span className="session-status-badge pending">Now</span>
                               ) : (
@@ -4796,8 +4978,10 @@ export default function App() {
 
         {toast && (
           <div className="toast-container">
-            <div className={`toast toast-${toast.type}`}>
-              <span className="toast-icon">{toast.type === 'success' ? '✅' : '❌'}</span>
+            <div className={`toast toast-${toast.type}`} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span className="toast-icon" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                {toast.type === 'success' ? <SmartIcon name="check" size={13} color="#10b981" /> : <SmartIcon name="cross" size={13} color="#ef4444" />}
+              </span>
               <span>{toast.message}</span>
             </div>
           </div>
@@ -5046,7 +5230,9 @@ export default function App() {
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>
-                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>👤 {cls.students?.length || 0} Students</span>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <SmartIcon name="user" size={13} /> {cls.students?.length || 0} Students
+                      </span>
                       <span style={{ fontSize: '0.8rem', color: 'var(--primary-light)', fontWeight: 700 }}>Inspect →</span>
                     </div>
                   </div>
@@ -5162,8 +5348,10 @@ export default function App() {
 
         {toast && (
           <div className="toast-container">
-            <div className={`toast toast-${toast.type}`}>
-              <span className="toast-icon">{toast.type === 'success' ? '✅' : '❌'}</span>
+            <div className={`toast toast-${toast.type}`} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span className="toast-icon" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                {toast.type === 'success' ? <SmartIcon name="check" size={13} color="#10b981" /> : <SmartIcon name="cross" size={13} color="#ef4444" />}
+              </span>
               <span>{toast.message}</span>
             </div>
           </div>
@@ -5590,8 +5778,8 @@ export default function App() {
                 <div className="submit-loader" id="submitLoader"></div>
               </button>
 
-              <p className="form-note" id="formNote">
-                Protected by end-to-end encryption &nbsp;[🔐]
+              <p className="form-note" id="formNote" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
+                Protected by end-to-end encryption <SmartIcon name="lock" size={11} color="var(--text-muted)" />
               </p>
             </form>
           </div>
@@ -5601,8 +5789,10 @@ export default function App() {
       {/* ===== TOAST NOTIFICATIONS ===== */}
       {toast && (
         <div className="toast-container">
-          <div className={`toast toast-${toast.type}`}>
-            <span className="toast-icon">{toast.type === 'success' ? '✅' : '❌'}</span>
+          <div className={`toast toast-${toast.type}`} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <span className="toast-icon" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+              {toast.type === 'success' ? <SmartIcon name="check" size={13} color="#10b981" /> : <SmartIcon name="cross" size={13} color="#ef4444" />}
+            </span>
             <span>{toast.message}</span>
           </div>
         </div>

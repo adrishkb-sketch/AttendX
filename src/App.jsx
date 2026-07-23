@@ -295,6 +295,36 @@ export default function App() {
   useEffect(() => {
     loadAllData();
 
+    // Restore login session from localStorage to prevent logout on refresh
+    const adminSession = localStorage.getItem('attendx_admin_session');
+    if (adminSession === 'true') {
+      setCurrentPage('admin');
+    } else {
+      const studentSession = localStorage.getItem('attendx_student_session');
+      if (studentSession) {
+        try {
+          const parsed = JSON.parse(studentSession);
+          setActiveStudentInfo(parsed);
+          setCurrentPage('student_dashboard');
+          refreshAttendanceLogs(parsed.student.id, parsed.classId);
+        } catch (e) {
+          console.error("Failed to restore student session", e);
+        }
+      } else {
+        const profSession = localStorage.getItem('attendx_professor_session');
+        if (profSession) {
+          try {
+            const parsed = JSON.parse(profSession);
+            setActiveProfessorInfo(parsed);
+            setCurrentPage('professor_dashboard');
+            getAllAttendanceLogs().then(logs => setProfAllAttendanceLogs(logs));
+          } catch (e) {
+            console.error("Failed to restore professor session", e);
+          }
+        }
+      }
+    }
+
     // Subscribe to realtime database updates if Firebase is active
     const db = getFirestoreDb();
     const unsubscribes = [];
@@ -1769,8 +1799,8 @@ export default function App() {
     };
 
     return (
-      <div className="login-modal-overlay active" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
-        <div className="login-modal-box animate-scale-up" style={{ maxWidth: '440px', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+      <div className="modal-overlay open" style={{ zIndex: 1100 }}>
+        <div className="modal card animate-scale-up" style={{ maxWidth: '440px', padding: '2rem' }}>
           
           <div className="modal-header-row" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
             <span className="logo-text" style={{ fontSize: '1.1rem', fontWeight: '900', color: 'var(--primary-light)' }}>
@@ -2175,6 +2205,7 @@ export default function App() {
       const isAdmin = checkUserId === 'Adrish07' && checkPassword === '15062007Adrish!';
       
       if (isAdmin) {
+        localStorage.setItem('attendx_admin_session', 'true');
         triggerToast('Welcome Admin Adrish! Redirecting...', 'success');
         setCurrentPage('admin');
         closeLoginModal();
@@ -2184,6 +2215,7 @@ export default function App() {
           // Dynamic student credentials check against classes database
           const authResult = await validateStudentLogin(checkUserId, checkPassword);
           if (authResult.isAuthenticated) {
+            localStorage.setItem('attendx_student_session', JSON.stringify(authResult));
             setActiveStudentInfo(authResult);
             setStudentTab('scan');
             setScanState(null);
@@ -2198,6 +2230,7 @@ export default function App() {
           // Dynamic professor credentials check against professors database
           const authResult = await validateProfessorLogin(checkUserId, checkPassword);
           if (authResult.isAuthenticated) {
+            localStorage.setItem('attendx_professor_session', JSON.stringify(authResult));
             setActiveProfessorInfo(authResult);
             setSelectedProfClass(null);
             setSelectedProfSubject(null);
@@ -2781,7 +2814,7 @@ export default function App() {
                 </div>
               </div>
 
-              <button className="btn-secondary" style={{ padding: '0.45rem 1.25rem', fontSize: '0.85rem' }} onClick={() => setCurrentPage('landing')}>
+              <button className="btn-secondary" style={{ padding: '0.45rem 1.25rem', fontSize: '0.85rem' }} onClick={() => { localStorage.removeItem('attendx_admin_session'); setCurrentPage('landing'); }}>
                 Log Out
               </button>
             </div>
@@ -3787,8 +3820,8 @@ export default function App() {
 
         {/* ===== ATTENDANCE QR CODE MODAL ===== */}
         {activeQRClass && (
-          <div className="login-modal-overlay active" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
-            <div className="login-modal-box animate-scale-up" style={{ maxWidth: '440px', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '1rem' }}>
+          <div className="modal-overlay open" style={{ zIndex: 1100 }}>
+            <div className="modal card animate-scale-up" style={{ maxWidth: '440px', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
               
               <div className="modal-header-row" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span className="logo-text" style={{ fontSize: '1.1rem', fontWeight: '900', color: 'var(--primary-light)' }}>
@@ -4105,7 +4138,7 @@ export default function App() {
                 </div>
               </div>
               <button className="btn-secondary" style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }}
-                onClick={() => { setActiveStudentInfo(null); setCurrentPage('landing'); setScanState(null); }}>
+                onClick={() => { localStorage.removeItem('attendx_student_session'); setActiveStudentInfo(null); setCurrentPage('landing'); setScanState(null); }}>
                 Sign Out
               </button>
             </div>
@@ -4166,94 +4199,34 @@ export default function App() {
 
               {/* SCAN RESULT CARD or SCAN BUTTON */}
               {!scanState ? (
-                <div className="scan-center-card">
-                  <div className="qr-radar-wrapper">
-                    <div className={`qr-radar-ring ${scanAnimating ? 'scanning' : ''}`}>
+                <div className="scan-center-card" style={{ padding: '2rem 1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '1.25rem' }}>
+                  <div 
+                    className="qr-radar-wrapper" 
+                    style={{ cursor: 'pointer' }} 
+                    onClick={startCameraScanner}
+                  >
+                    <div className="qr-radar-ring">
                       <div className="qr-radar-inner">
-                        {scanAnimating ? (
-                          <div className="qr-scan-spinner">
-                            <div className="qr-scan-line"></div>
-                          </div>
-                        ) : (
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="qr-icon-svg">
-                            <path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/>
-                            <path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
-                            <rect x="7" y="7" width="10" height="10" rx="1"/>
-                          </svg>
-                        )}
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="qr-icon-svg">
+                          <path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/>
+                          <path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
+                          <rect x="7" y="7" width="10" height="10" rx="1"/>
+                        </svg>
                       </div>
                     </div>
-                    {scanAnimating && (
-                      <>
-                        <div className="radar-pulse-ring r1"></div>
-                        <div className="radar-pulse-ring r2"></div>
-                        <div className="radar-pulse-ring r3"></div>
-                      </>
-                    )}
                   </div>
 
-                  <h2 className="scan-card-title">
-                    {scanAnimating ? 'Reading QR Code...' : 'Mark Your Attendance'}
-                  </h2>
-                  <p className="scan-card-subtitle">
-                    {scanAnimating
-                      ? 'Processing your scan. Please hold still.'
-                      : 'Tap the button below to scan the QR code posted in your classroom to mark entry or exit.'}
-                  </p>
+                  <div>
+                    <h2 className="scan-card-title" style={{ margin: '0 0 0.25rem 0' }}>Mark Your Attendance</h2>
+                    <p className="scan-card-subtitle" style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-dim)' }}>
+                      Tap the scan button or the QR icon above to open the camera scanner modal and confirm your classroom session check-in/out.
+                    </p>
+                  </div>
 
-                  {/* GCECT Geofencing Widget */}
-                  {!scanAnimating && (
-                    <div style={{
-                      width: '100%',
-                      padding: '0.85rem 1rem',
-                      background: 'rgba(255, 255, 255, 0.02)',
-                      border: '1px solid rgba(255, 255, 255, 0.05)',
-                      borderRadius: '12px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.5rem',
-                      marginBottom: '1rem',
-                      textAlign: 'left'
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text)' }}>
-                          📍 Geofencing: <span style={{ color: 'var(--primary-light)' }}>GCECT Campus</span>
-                        </span>
-                        <span style={{
-                          fontSize: '0.68rem',
-                          padding: '0.2rem 0.5rem',
-                          borderRadius: '10px',
-                          background: mockGcectLocation ? 'rgba(16, 185, 129, 0.12)' : 'rgba(124, 58, 237, 0.12)',
-                          color: mockGcectLocation ? 'var(--accent-light)' : 'var(--primary-light)',
-                          fontWeight: 700
-                        }}>
-                          {mockGcectLocation ? 'Mock Active' : 'Real GPS Active'}
-                        </span>
-                      </div>
-
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.75rem', color: 'var(--text-dim)', userSelect: 'none' }}>
-                        <input
-                          type="checkbox"
-                          checked={mockGcectLocation}
-                          onChange={(e) => setMockGcectLocation(e.target.checked)}
-                          style={{ accentColor: 'var(--primary)' }}
-                        />
-                        Mock current location at GCECT Campus
-                      </label>
-                      
-                      {geoChecking && (
-                        <div style={{ fontSize: '0.7rem', color: 'var(--primary-light)', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.2rem' }}>
-                          <span className="spinner-mini" style={{ width: '10px', height: '10px', border: '2px solid var(--primary-light)', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.6s linear infinite' }} />
-                          Querying device GPS coordinates...
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {pendingEntry && !scanAnimating && (
-                    <div className="pending-entry-alert">
+                  {pendingEntry && (
+                    <div className="pending-entry-alert" style={{ width: '100%', margin: 0 }}>
                       <span className="pending-alert-dot"></span>
-                      <div>
+                      <div style={{ textAlign: 'left' }}>
                         <div className="pending-alert-label">Class In Progress</div>
                         <div className="pending-alert-subject">{pendingEntry.subjectName}</div>
                         <div className="pending-alert-meta">Entered at {formatTime(pendingEntry.entryTime)} · Exit opens at {minutesToDisplay(timeToMinutes(pendingEntry.periodEnd) - 5)}</div>
@@ -4262,26 +4235,18 @@ export default function App() {
                   )}
 
                   <button
-                    className={`btn-scan-qr ${scanAnimating ? 'disabled' : ''}`}
+                    className="btn-scan-qr"
                     onClick={startCameraScanner}
-                    disabled={scanAnimating}
                     id="scanQRBtn"
+                    style={{ width: '100%', padding: '0.85rem 1rem', fontSize: '0.95rem' }}
                   >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/>
-                      <path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
-                      <rect x="7" y="7" width="10" height="10" rx="1"/>
-                    </svg>
-                    {scanAnimating ? 'Scanning...' : (pendingEntry ? '📷 Open Camera to Exit Class' : '📷 Open Camera to Scan QR')}
+                    📷 Scan Attendance QR
                   </button>
-                  <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '0.5rem', textAlign: 'center' }}>
-                    Uses device camera to scan the official AttendX QR poster.
-                  </p>
 
-                  {/* CAMERA OVERLAY MODAL */}
+                  {/* CAMERA OVERLAY POPUP MODAL */}
                   {isScanning && (
-                    <div className="login-modal-overlay active" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: '1rem' }}>
-                      <div className="login-modal-box animate-scale-up" style={{ width: '100%', maxWidth: '440px', padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1rem', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                    <div className="modal-overlay open" style={{ zIndex: 1200 }}>
+                      <div className="modal card animate-scale-up" style={{ maxWidth: '450px', padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                         <div className="modal-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
                           <span className="logo-text" style={{ fontSize: '1.05rem', fontWeight: '900', color: 'var(--primary-light)' }}>
                             📷 Camera QR Scanner
@@ -4296,8 +4261,8 @@ export default function App() {
                           </button>
                         </div>
 
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, textAlign: 'center' }}>
-                          Please point your camera at the QR code displayed on the professor's screen.
+                        <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0, textAlign: 'center' }}>
+                          Please point your device camera at the QR code displayed on the professor's screen.
                         </p>
 
                         <div 
@@ -4311,6 +4276,52 @@ export default function App() {
                             boxShadow: 'inset 0 0 10px rgba(0,0,0,0.8)'
                           }}
                         ></div>
+
+                        {/* GCECT Geofencing Widget inside popup modal */}
+                        <div style={{
+                          width: '100%',
+                          padding: '0.85rem 1rem',
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          border: '1px solid rgba(255, 255, 255, 0.05)',
+                          borderRadius: '12px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.5rem',
+                          textAlign: 'left'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text)' }}>
+                              📍 Geofencing: <span style={{ color: 'var(--primary-light)' }}>GCECT Campus</span>
+                            </span>
+                            <span style={{
+                              fontSize: '0.68rem',
+                              padding: '0.2rem 0.5rem',
+                              borderRadius: '10px',
+                              background: mockGcectLocation ? 'rgba(16, 185, 129, 0.12)' : 'rgba(124, 58, 237, 0.12)',
+                              color: mockGcectLocation ? 'var(--accent-light)' : 'var(--primary-light)',
+                              fontWeight: 700
+                            }}>
+                              {mockGcectLocation ? 'Mock Active' : 'Real GPS Active'}
+                            </span>
+                          </div>
+
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.75rem', color: 'var(--text-dim)', userSelect: 'none' }}>
+                            <input
+                              type="checkbox"
+                              checked={mockGcectLocation}
+                              onChange={(e) => setMockGcectLocation(e.target.checked)}
+                              style={{ accentColor: 'var(--primary)' }}
+                            />
+                            Mock current location at GCECT Campus
+                          </label>
+                          
+                          {geoChecking && (
+                            <div style={{ fontSize: '0.7rem', color: 'var(--primary-light)', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.2rem' }}>
+                              <span className="spinner-mini" style={{ width: '10px', height: '10px', border: '2px solid var(--primary-light)', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.6s linear infinite' }} />
+                              Querying GPS coordinates...
+                            </div>
+                          )}
+                        </div>
 
                         {scannerError && (
                           <div style={{ color: '#ef4444', fontSize: '0.72rem', textAlign: 'center', background: 'rgba(239, 68, 68, 0.08)', padding: '0.5rem', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
@@ -5044,7 +5055,7 @@ export default function App() {
                 </div>
               </div>
               <button className="btn-secondary" style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }}
-                onClick={() => { setActiveProfessorInfo(null); setCurrentPage('landing'); setSelectedProfClass(null); }}>
+                onClick={() => { localStorage.removeItem('attendx_professor_session'); setActiveProfessorInfo(null); setCurrentPage('landing'); setSelectedProfClass(null); }}>
                 Sign Out
               </button>
             </div>
@@ -5109,8 +5120,8 @@ export default function App() {
 
         {/* MODAL 2: ATTENDANCE QR CODE MODAL FOR PROFESSORS */}
         {activeQRClass && (
-          <div className="login-modal-overlay active" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
-            <div className="login-modal-box animate-scale-up" style={{ maxWidth: '440px', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '1rem' }}>
+          <div className="modal-overlay open" style={{ zIndex: 1100 }}>
+            <div className="modal card animate-scale-up" style={{ maxWidth: '440px', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
               
               <div className="modal-header-row" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span className="logo-text" style={{ fontSize: '1.1rem', fontWeight: '900', color: 'var(--primary-light)' }}>

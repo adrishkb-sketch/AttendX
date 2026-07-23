@@ -317,34 +317,40 @@ export default function App() {
     const db = getFirestoreDb();
     if (!db) return;
 
-    const unsubscribe = onSnapshot(collection(db, 'attendance'), async (snapshot) => {
-      console.log("Firebase Realtime database change detected");
-      
-      if (currentPage === 'professor_dashboard' || currentPage === 'admin') {
-        const allLogs = await getAllAttendanceLogs();
-        setProfAllAttendanceLogs(allLogs);
+    const unsubscribe = onSnapshot(
+      collection(db, 'attendance'),
+      async (snapshot) => {
+        console.log("Firebase Realtime database change detected");
         
-        if (selectedProfStudent && selectedProfClass) {
-          const currentClass = classes.find(c => c.id === selectedProfClass.id);
-          let classSubjects = [];
-          const routine = currentClass?.routine || [];
-          routine.forEach(p => {
-            if (p.type === 'Theory') {
-              classSubjects.push({ id: p.subjectId, name: p.subjectName, type: 'Theory' });
-            } else {
-              if (p.groupA) classSubjects.push({ id: p.groupA.subjectId, name: p.groupA.subjectName, type: 'Practical' });
-              if (p.groupB) classSubjects.push({ id: p.groupB.subjectId, name: p.groupB.subjectName, type: 'Practical' });
+        if (currentPage === 'professor_dashboard' || currentPage === 'admin') {
+          const allLogs = await getAllAttendanceLogs();
+          setProfAllAttendanceLogs(allLogs);
+          
+          if (selectedProfStudent && selectedProfClass) {
+            const currentClass = classes.find(c => c.id === selectedProfClass.id);
+            let classSubjects = [];
+            const routine = currentClass?.routine || [];
+            routine.forEach(p => {
+              if (p.type === 'Theory') {
+                classSubjects.push({ id: p.subjectId, name: p.subjectName, type: 'Theory' });
+              } else {
+                if (p.groupA) classSubjects.push({ id: p.groupA.subjectId, name: p.groupA.subjectName, type: 'Practical' });
+                if (p.groupB) classSubjects.push({ id: p.groupB.subjectId, name: p.groupB.subjectName, type: 'Practical' });
+              }
+            });
+            const currentSub = selectedProfSubject || (classSubjects.length > 0 ? classSubjects[0] : null);
+            if (currentSub) {
+              await refreshSelectedStudentLogs(selectedProfStudent.id, selectedProfClass.id, currentSub);
             }
-          });
-          const currentSub = selectedProfSubject || (classSubjects.length > 0 ? classSubjects[0] : null);
-          if (currentSub) {
-            await refreshSelectedStudentLogs(selectedProfStudent.id, selectedProfClass.id, currentSub);
           }
+        } else if (currentPage === 'student_dashboard' && activeStudentInfo) {
+          await refreshAttendanceLogs(activeStudentInfo.student.id);
         }
-      } else if (currentPage === 'student_dashboard' && activeStudentInfo) {
-        await refreshAttendanceLogs(activeStudentInfo.student.id);
+      },
+      (error) => {
+        console.warn("Firestore realtime snapshot listener error (check security rules):", error);
       }
-    });
+    );
 
     return () => unsubscribe();
   }, [currentPage, activeStudentInfo, selectedProfStudent, selectedProfClass, selectedProfSubject, classes]);

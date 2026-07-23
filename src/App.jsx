@@ -3,7 +3,7 @@ import {
   getClasses, saveClass, deleteClass, validateStudentLogin, isFirebaseConfigured,
   getSubjects, saveSubject, deleteSubject, getProfessors, saveProfessor, deleteProfessor, validateProfessorLogin,
   getFirestoreDb, getAttendanceLogs, saveAttendanceEntry, updateAttendanceExit, getAllAttendanceLogs,
-  deleteAttendanceLog, updateAttendanceLog
+  deleteAttendanceLog, updateAttendanceLog, getAdjustments, saveAdjustment, deleteAdjustment
 } from './db';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { drawStylishQR } from './qrHelper';
@@ -120,6 +120,20 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
+  // Geofencing and schedule adjustments states
+  const [mockGcectLocation, setMockGcectLocation] = useState(true); // Default checked for testing
+  const [geoChecking, setGeoChecking] = useState(false);
+  const [classAdjustments, setClassAdjustments] = useState([]);
+  const [studentAdjustments, setStudentAdjustments] = useState([]);
+  
+  // Reschedule/Cancel Modal states
+  const [adjustmentModalPeriod, setAdjustmentModalPeriod] = useState(null);
+  const [adjustmentDate, setAdjustmentDate] = useState(getTodayDate());
+  const [adjustmentType, setAdjustmentType] = useState('cancelled'); // cancelled | rescheduled
+  const [rescheduleDate, setRescheduleDate] = useState(getTodayDate());
+  const [rescheduleStartTime, setRescheduleStartTime] = useState('09:00');
+  const [rescheduleEndTime, setRescheduleEndTime] = useState('10:00');
+
   // Load all system data on mount and subscribe to realtime updates
   useEffect(() => {
     loadAllData();
@@ -130,7 +144,7 @@ export default function App() {
     
     if (db) {
       try {
-        const collections = ['classes', 'students', 'subjects', 'professors'];
+        const collections = ['classes', 'students', 'subjects', 'professors', 'adjustments'];
         collections.forEach(colName => {
           const unsub = onSnapshot(
             collection(db, colName),
@@ -299,7 +313,7 @@ export default function App() {
     const db = getFirestoreDb();
     if (!db) return;
 
-    const unsubscribe = onSnapshot(
+    const unsubscribeLogs = onSnapshot(
       collection(db, 'attendance'),
       async (snapshot) => {
         console.log("Firebase Realtime database change detected");
@@ -334,8 +348,41 @@ export default function App() {
       }
     );
 
-    return () => unsubscribe();
+    const unsubscribeAdjustments = onSnapshot(
+      collection(db, 'adjustments'),
+      async (snapshot) => {
+        console.log("Firebase Realtime adjustments update received");
+        if (selectedProfClass) {
+          const adjs = await getAdjustments(selectedProfClass.id);
+          setClassAdjustments(adjs);
+        }
+        if (activeStudentInfo) {
+          const adjs = await getAdjustments(activeStudentInfo.classId);
+          setStudentAdjustments(adjs);
+        }
+      },
+      (error) => {
+        console.warn("Firestore adjustments listener error:", error);
+      }
+    );
+
+    return () => {
+      unsubscribeLogs();
+      unsubscribeAdjustments();
+    };
   }, [currentPage, activeStudentInfo, selectedProfStudent, selectedProfClass, selectedProfSubject, classes]);
+
+  useEffect(() => {
+    const fetchClassAdjustments = async () => {
+      if (selectedProfClass) {
+        const adjs = await getAdjustments(selectedProfClass.id);
+        setClassAdjustments(adjs);
+      } else {
+        setClassAdjustments([]);
+      }
+    };
+    fetchClassAdjustments();
+  }, [selectedProfClass]);
 
   const openLoginModal = (initialRole = 'student') => {
     setRole(initialRole);
@@ -409,28 +456,160 @@ export default function App() {
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   };
 
+  /** Get day name from YYYY-MM-DD e.g. "Monday" */
+  const getDayNameFromDate = (dateStr) => {
+    const d = new Date(dateStr);
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return days[d.getDay()];
+  };
+
+  /** Calculate distance between two coordinates using Haversine formula */
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371e3; // Earth radius in meters
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // In meters
+  };
+
+  /** Check if the student's current location is inside GCECT campus */
+  const GCECT_LAT = 22.56486;
+  const GCECT_LON = 88.39114;
+  const GCECT_RADIUS_METERS = 200;
+
+  const checkGeofence = () => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("Geolocation is not supported by your browser."));
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          const dist = calculateDistance(latitude, longitude, GCECT_LAT, GCECT_LON);
+          resolve({
+            inRange: dist <= GCECT_RADIUS_METERS,
+            distance: Math.round(dist),
+            latitude,
+            longitude
+          });
+        },
+        (error) => {
+          reject(error);
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+      );
+    });
+  };
+
+  /** Check if a rescheduled slot overlaps with active classes */
+  const checkOverlapForRescheduling = (currentClass, targetDate, startStr, endStr, excludePeriodId = null) => {
+    const newStart = timeToMinutes(startStr);
+    const newEnd = timeToMinutes(endStr);
+    const dayName = getDayNameFromDate(targetDate);
+    
+    // 1. Check routine periods on this weekday
+    const routinePeriods = currentClass.routine || [];
+    const weekdayPeriods = routinePeriods.filter(p => p.day === dayName);
+    
+    const hasRoutineOverlap = weekdayPeriods.some(p => {
+      if (excludePeriodId && p.id === excludePeriodId) return false;
+      const pStart = timeToMinutes(p.startTime);
+      const pEnd = timeToMinutes(p.endTime);
+      const overlaps = (newStart < pEnd && newEnd > pStart);
+      
+      if (overlaps) {
+        // Overlaps routine, check if routine period is vacated (cancelled or rescheduled away) on this date
+        const isVacated = classAdjustments.some(adj => 
+          adj.periodId === p.id && 
+          adj.date === targetDate && 
+          (adj.status === 'cancelled' || adj.status === 'rescheduled')
+        );
+        return !isVacated;
+      }
+      return false;
+    });
+
+    if (hasRoutineOverlap) return true;
+
+    // 2. Check other rescheduled classes on this date
+    const hasRescheduledOverlap = classAdjustments.some(adj => {
+      if (adj.date === targetDate && adj.status === 'rescheduled') {
+        if (excludePeriodId && adj.periodId === excludePeriodId) return false;
+        const adjStart = timeToMinutes(adj.rescheduledStartTime);
+        const adjEnd = timeToMinutes(adj.rescheduledEndTime);
+        return (newStart < adjEnd && newEnd > adjStart);
+      }
+      return false;
+    });
+
+    return hasRescheduledOverlap;
+  };
+
   /**
    * Core period resolution. Given a routine and the current time, returns:
    * { type: 'current' | 'exit_window' | 'upcoming' | 'none', period, nextPeriod, nowMinutes }
    */
-  const resolveCurrentPeriod = (routine, studentGroup) => {
-    const today = getTodayDayName();
+  const resolveCurrentPeriod = (routine, studentGroup, adjustments = []) => {
+    const todayDay = getTodayDayName();
+    const todayDate = getTodayDate();
     const now = new Date();
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
-    // Get today's periods sorted by start time
-    const todayPeriods = routine
-      .filter(p => p.day === today)
-      .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+    // 1. Get today's scheduled routine periods
+    let activePeriods = [];
+    
+    // Find weekday routine periods
+    const routinePeriods = routine.filter(p => p.day === todayDay);
+    
+    routinePeriods.forEach(p => {
+      // Check if there is an adjustment (cancel or reschedule) for this routine period on this date
+      const adj = adjustments.find(a => a.periodId === p.id && a.date === todayDate);
+      if (adj) {
+        if (adj.status === 'cancelled' || adj.status === 'rescheduled') {
+          // Vacated/removed from original slot today
+          return;
+        }
+      }
+      // Running normally
+      activePeriods.push(p);
+    });
 
-    // For practicals, filter by student group relevance
-    const relevantPeriods = todayPeriods.filter(p => {
+    // 2. Add classes rescheduled INTO today
+    const incomingReschedules = adjustments.filter(a => a.rescheduledDate === todayDate && a.status === 'rescheduled');
+    incomingReschedules.forEach(adj => {
+      // Find the base routine period info
+      const basePeriod = routine.find(p => p.id === adj.periodId);
+      if (basePeriod) {
+        const rescheduledPeriod = {
+          ...basePeriod,
+          startTime: adj.rescheduledStartTime,
+          endTime: adj.rescheduledEndTime,
+          isRescheduled: true,
+          adjustmentId: adj.id
+        };
+        activePeriods.push(rescheduledPeriod);
+      }
+    });
+
+    // 3. Filter by student group (if Practical)
+    const relevantPeriods = activePeriods.filter(p => {
       if (p.type === 'Practical') {
-        // Practical is relevant if student's group has a slot
         return p.groupA || p.groupB;
       }
       return true;
     });
+
+    // 4. Sort by start time
+    relevantPeriods.sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
 
     let currentPeriod = null;
     let nextPeriod = null;
@@ -493,9 +672,15 @@ export default function App() {
   };
 
   /** Load attendance logs for student and derive pendingEntry */
-  const refreshAttendanceLogs = async (studentId) => {
+  const refreshAttendanceLogs = async (studentId, optionalClassId = null) => {
     const logs = await getAttendanceLogs(studentId);
     setAttendanceLogs(logs);
+
+    const classId = optionalClassId || (activeStudentInfo ? activeStudentInfo.classId : null);
+    if (classId) {
+      const adjs = await getAdjustments(classId);
+      setStudentAdjustments(adjs);
+    }
 
     // Find any open entry (same day, no exit)
     const today = getTodayDate();
@@ -588,7 +773,7 @@ export default function App() {
     }
 
     // === CASE: NO PENDING ENTRY (ENTRY SCAN) ===
-    const { currentPeriod, exitWindowPeriod, nextPeriod, nowMinutes, todayPeriods } = resolveCurrentPeriod(routine, studentGroup);
+    const { currentPeriod, exitWindowPeriod, nextPeriod, nowMinutes, todayPeriods } = resolveCurrentPeriod(routine, studentGroup, studentAdjustments);
 
     // Check: is there a stale open entry from a PREVIOUS day?
     // (handled above but double-check for safety)
@@ -757,15 +942,48 @@ export default function App() {
   };
 
   /** Handle the simulate-scan button press */
-  const handleSimulateScan = () => {
+  const handleSimulateScan = async () => {
     if (!activeStudentInfo) return;
     setScanAnimating(true);
-    setTimeout(async () => {
+    setGeoChecking(true);
+    
+    try {
+      let geoResult = { inRange: true, distance: 0 };
+      
+      if (!mockGcectLocation) {
+        geoResult = await checkGeofence();
+      }
+      
+      setTimeout(async () => {
+        setScanAnimating(false);
+        setGeoChecking(false);
+        
+        if (!geoResult.inRange) {
+          setScanState({
+            type: 'geo_error',
+            icon: '📍',
+            title: 'Out of Campus Range',
+            message: `You are currently ${geoResult.distance} meters away from the GCECT campus.`,
+            subMessage: `Attendance scans are restricted to GCECT campus radius (200m). Please scan inside the campus.`
+          });
+          return;
+        }
+
+        const qrData = `attendx://mark-attendance?classId=${activeStudentInfo.classId}`;
+        const result = await processQRScan(qrData, activeStudentInfo);
+        setScanState(result);
+      }, 1200);
+    } catch (err) {
       setScanAnimating(false);
-      const qrData = `attendx://mark-attendance?classId=${activeStudentInfo.classId}`;
-      const result = await processQRScan(qrData, activeStudentInfo);
-      setScanState(result);
-    }, 1200);
+      setGeoChecking(false);
+      setScanState({
+        type: 'geo_error',
+        icon: '📍',
+        title: 'Location Access Required',
+        message: 'Could not access your location. Please grant GPS permission to verify you are on campus.',
+        subMessage: err.message || 'Location lookup timed out.'
+      });
+    }
   };
 
   /** Force-close a stale previous-day entry */
@@ -1129,6 +1347,123 @@ export default function App() {
           </div>
         </div>
 
+        {/* Timetable & Daily Schedule Adjustments */}
+        <div className="analytics-section-card" style={{ padding: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
+            <div>
+              <h3 className="analytics-section-title" style={{ margin: 0 }}>Timetable &amp; Schedule Adjustments</h3>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)', margin: '0.15rem 0 0 0' }}>
+                View routine timetable and reschedule or cancel classes for specific dates.
+              </p>
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Target Date:</span>
+              <input 
+                type="date" 
+                className="form-input" 
+                style={{ width: '150px', padding: '0.35rem 0.5rem', fontSize: '0.82rem', background: 'var(--bg-2)', border: '1px solid var(--border)', color: 'var(--text)' }} 
+                value={adjustmentDate} 
+                onChange={(e) => {
+                  setAdjustmentDate(e.target.value);
+                  setRescheduleDate(e.target.value);
+                }} 
+              />
+            </div>
+          </div>
+
+          {/* Routine List for the Class */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {(currentClass.routine || []).length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-dim)', fontSize: '0.85rem' }}>
+                No classes scheduled in routine yet.
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
+                {(currentClass.routine || []).map(period => {
+                  const adj = classAdjustments.find(a => a.periodId === period.id && a.date === adjustmentDate);
+                  
+                  const isAssigned = currentPage === 'admin' || (
+                    period.type === 'Theory' 
+                      ? period.professors?.some(pr => pr.id === profId)
+                      : (period.groupA?.professors?.some(pr => pr.id === profId) || period.groupB?.professors?.some(pr => pr.id === profId))
+                  );
+
+                  let statusText = 'Normal Schedule';
+                  let statusClass = 'present';
+                  if (adj) {
+                    if (adj.status === 'cancelled') {
+                      statusText = 'Cancelled Today';
+                      statusClass = 'absent_no_exit';
+                    } else if (adj.status === 'rescheduled') {
+                      statusText = `Rescheduled to ${formatDate(adj.rescheduledDate)} (${adj.rescheduledStartTime}-${adj.rescheduledEndTime})`;
+                      statusClass = 'pending';
+                    }
+                  }
+
+                  return (
+                    <div key={period.id} style={{
+                      background: 'rgba(255,255,255,0.01)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '12px',
+                      padding: '1rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      gap: '0.75rem'
+                    }}>
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                          <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--primary-light)' }}>
+                            {period.type === 'Theory' ? period.subjectName : `${period.groupA?.subjectName} (Group A) / ${period.groupB?.subjectName} (Group B)`}
+                          </span>
+                          <span className={`session-status-badge ${statusClass}`} style={{ fontSize: '0.65rem' }}>
+                            {statusText}
+                          </span>
+                        </div>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text)', margin: 0 }}>
+                          🗓️ {period.day}s · {period.startTime} - {period.endTime} ({period.type})
+                        </p>
+                        <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', margin: '0.2rem 0 0 0' }}>
+                          👤 Assigned: {period.type === 'Theory' 
+                            ? period.professors?.map(pr => pr.name).join(', ') 
+                            : `A: ${period.groupA?.professors?.map(p=>p.name).join(', ')} | B: ${period.groupB?.professors?.map(p=>p.name).join(', ')}`}
+                        </p>
+                      </div>
+
+                      {isAssigned && (
+                        <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '0.5rem' }}>
+                          {adj ? (
+                            <button className="btn-secondary" style={{ flex: 1, padding: '0.3rem 0.5rem', fontSize: '0.75rem', color: 'var(--error)' }}
+                              onClick={async () => {
+                                if (window.confirm('Delete adjustment and restore normal routine period?')) {
+                                  await deleteAdjustment(adj.id, currentClass.id);
+                                  const list = await getAdjustments(currentClass.id);
+                                  setClassAdjustments(list);
+                                  triggerToast('Adjustment deleted and class schedule restored!', 'success');
+                                }
+                              }}>
+                              🗑️ Clear Adjustment
+                            </button>
+                          ) : (
+                            <button className="btn-primary" style={{ flex: 1, padding: '0.35rem 0.5rem', fontSize: '0.75rem', background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.3)', color: 'var(--primary-light)', boxShadow: 'none' }}
+                              onClick={() => {
+                                setAdjustmentModalPeriod(period);
+                                setAdjustmentType('cancelled');
+                              }}>
+                              ⚙️ Adjust Schedule
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Search & Filters */}
         <div className="analytics-section-card">
           <div className="analytics-section-header" style={{ flexWrap: 'wrap', gap: '1rem' }}>
@@ -1255,6 +1590,181 @@ export default function App() {
               </table>
             </div>
           )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderAdjustmentModal = () => {
+    if (!adjustmentModalPeriod) return null;
+    const currentClass = selectedProfClass ? classes.find(c => c.id === selectedProfClass.id) : null;
+    if (!currentClass) return null;
+
+    const handleSaveAdjustment = async (e) => {
+      e.preventDefault();
+      
+      // If rescheduling, run overlap checks
+      if (adjustmentType === 'rescheduled') {
+        if (!rescheduleDate || !rescheduleStartTime || !rescheduleEndTime) {
+          triggerToast('Please fill in reschedule date, start time, and end time.', 'error');
+          return;
+        }
+        
+        const isOverlapping = checkOverlapForRescheduling(
+          currentClass, 
+          rescheduleDate, 
+          rescheduleStartTime, 
+          rescheduleEndTime, 
+          adjustmentModalPeriod.id
+        );
+
+        if (isOverlapping) {
+          triggerToast('Cannot reschedule: The target slot overlaps with another scheduled class on that day!', 'error');
+          return;
+        }
+      }
+
+      const adjData = {
+        classId: currentClass.id,
+        periodId: adjustmentModalPeriod.id,
+        date: adjustmentDate,
+        status: adjustmentType,
+        rescheduledDate: adjustmentType === 'rescheduled' ? rescheduleDate : null,
+        rescheduledStartTime: adjustmentType === 'rescheduled' ? rescheduleStartTime : null,
+        rescheduledEndTime: adjustmentType === 'rescheduled' ? rescheduleEndTime : null
+      };
+
+      await saveAdjustment(adjData);
+      const list = await getAdjustments(currentClass.id);
+      setClassAdjustments(list);
+      setAdjustmentModalPeriod(null);
+      triggerToast('Timetable adjustment saved successfully!', 'success');
+    };
+
+    return (
+      <div className="login-modal-overlay active" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
+        <div className="login-modal-box animate-scale-up" style={{ maxWidth: '440px', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+          
+          <div className="modal-header-row" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
+            <span className="logo-text" style={{ fontSize: '1.1rem', fontWeight: '900', color: 'var(--primary-light)' }}>
+              ⚙️ Adjust Timetable Slot
+            </span>
+            <button 
+              type="button" 
+              className="modal-close" 
+              onClick={() => setAdjustmentModalPeriod(null)}
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', fontSize: '1.25rem', cursor: 'pointer' }}
+            >
+              ✕
+            </button>
+          </div>
+
+          <div>
+            <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-dim)', letterSpacing: '0.5px' }}>Routine Period Info</span>
+            <h3 style={{ fontSize: '1.1rem', fontFamily: 'Outfit', fontWeight: '800', margin: '0.1rem 0 0.25rem 0', color: 'var(--text)' }}>
+              {adjustmentModalPeriod.type === 'Theory' ? adjustmentModalPeriod.subjectName : 'Practical Lab (A/B)'}
+            </h3>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
+              Original Slot: {adjustmentModalPeriod.day}s · {adjustmentModalPeriod.startTime} - {adjustmentModalPeriod.endTime}
+            </p>
+          </div>
+
+          <form onSubmit={handleSaveAdjustment} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-dim)' }}>Adjustment Date</label>
+              <input 
+                type="date" 
+                className="form-input" 
+                style={{ padding: '0.45rem', fontSize: '0.85rem' }} 
+                value={adjustmentDate} 
+                onChange={(e) => setAdjustmentDate(e.target.value)} 
+                required 
+              />
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-dim)' }}>Action type</label>
+              <select 
+                className="form-input" 
+                style={{ padding: '0.45rem', fontSize: '0.85rem', background: 'var(--bg-2)', border: '1px solid var(--border)', color: 'var(--text)' }} 
+                value={adjustmentType} 
+                onChange={(e) => setAdjustmentType(e.target.value)}
+              >
+                <option value="cancelled">🚫 Cancel Class for this Date</option>
+                <option value="rescheduled">🔁 Reschedule Class to a New Slot</option>
+              </select>
+            </div>
+
+            {adjustmentType === 'rescheduled' && (
+              <div style={{
+                padding: '0.85rem',
+                background: 'rgba(255,255,255,0.01)',
+                border: '1px solid var(--border)',
+                borderRadius: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.85rem',
+                marginTop: '0.25rem'
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  <label style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-dim)' }}>New Target Date</label>
+                  <input 
+                    type="date" 
+                    className="form-input" 
+                    style={{ padding: '0.4rem', fontSize: '0.82rem' }} 
+                    value={rescheduleDate} 
+                    onChange={(e) => setRescheduleDate(e.target.value)} 
+                    required 
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-dim)' }}>Start Time</label>
+                    <input 
+                      type="time" 
+                      className="form-input" 
+                      style={{ padding: '0.4rem', fontSize: '0.82rem' }} 
+                      value={rescheduleStartTime} 
+                      onChange={(e) => setRescheduleStartTime(e.target.value)} 
+                      required 
+                    />
+                  </div>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-dim)' }}>End Time</label>
+                    <input 
+                      type="time" 
+                      className="form-input" 
+                      style={{ padding: '0.4rem', fontSize: '0.82rem' }} 
+                      value={rescheduleEndTime} 
+                      onChange={(e) => setRescheduleEndTime(e.target.value)} 
+                      required 
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <button 
+                type="button" 
+                className="btn-secondary" 
+                style={{ flex: 1, padding: '0.5rem' }} 
+                onClick={() => setAdjustmentModalPeriod(null)}
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                className="btn-primary" 
+                style={{ flex: 1, padding: '0.5rem', background: 'linear-gradient(135deg, var(--accent), var(--accent-dark))', boxShadow: 'none' }}
+              >
+                Save Adjustment
+              </button>
+            </div>
+
+          </form>
         </div>
       </div>
     );
@@ -1530,7 +2040,7 @@ export default function App() {
             setActiveStudentInfo(authResult);
             setStudentTab('scan');
             setScanState(null);
-            await refreshAttendanceLogs(authResult.student.id);
+            await refreshAttendanceLogs(authResult.student.id, authResult.classId);
             triggerToast(`Logged in successfully as ${authResult.student.name}!`, 'success');
             setCurrentPage('student_dashboard');
             closeLoginModal();
@@ -3439,7 +3949,7 @@ export default function App() {
           <div className="student-tab-nav">
             <button
               className={`student-tab-btn ${studentTab === 'scan' ? 'active' : ''}`}
-              onClick={async () => { setStudentTab('scan'); await refreshAttendanceLogs(studentData.id); }}
+              onClick={async () => { setStudentTab('scan'); await refreshAttendanceLogs(studentData.id, activeStudentInfo.classId); }}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/>
@@ -3450,7 +3960,7 @@ export default function App() {
             </button>
             <button
               className={`student-tab-btn ${studentTab === 'analytics' ? 'active' : ''}`}
-              onClick={async () => { setStudentTab('analytics'); await refreshAttendanceLogs(studentData.id); }}
+              onClick={async () => { setStudentTab('analytics'); await refreshAttendanceLogs(studentData.id, activeStudentInfo.classId); }}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
@@ -3524,6 +4034,55 @@ export default function App() {
                       ? 'Processing your scan. Please hold still.'
                       : 'Tap the button below to scan the QR code posted in your classroom to mark entry or exit.'}
                   </p>
+
+                  {/* GCECT Geofencing Widget */}
+                  {!scanAnimating && (
+                    <div style={{
+                      width: '100%',
+                      padding: '0.85rem 1rem',
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid rgba(255, 255, 255, 0.05)',
+                      borderRadius: '12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.5rem',
+                      marginBottom: '1rem',
+                      textAlign: 'left'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text)' }}>
+                          📍 Geofencing: <span style={{ color: 'var(--primary-light)' }}>GCECT Campus</span>
+                        </span>
+                        <span style={{
+                          fontSize: '0.68rem',
+                          padding: '0.2rem 0.5rem',
+                          borderRadius: '10px',
+                          background: mockGcectLocation ? 'rgba(16, 185, 129, 0.12)' : 'rgba(124, 58, 237, 0.12)',
+                          color: mockGcectLocation ? 'var(--accent-light)' : 'var(--primary-light)',
+                          fontWeight: 700
+                        }}>
+                          {mockGcectLocation ? 'Mock Active' : 'Real GPS Active'}
+                        </span>
+                      </div>
+
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.75rem', color: 'var(--text-dim)', userSelect: 'none' }}>
+                        <input
+                          type="checkbox"
+                          checked={mockGcectLocation}
+                          onChange={(e) => setMockGcectLocation(e.target.checked)}
+                          style={{ accentColor: 'var(--primary)' }}
+                        />
+                        Mock current location at GCECT Campus
+                      </label>
+                      
+                      {geoChecking && (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--primary-light)', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.2rem' }}>
+                          <span className="spinner-mini" style={{ width: '10px', height: '10px', border: '2px solid var(--primary-light)', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.6s linear infinite' }} />
+                          Querying device GPS coordinates...
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {pendingEntry && !scanAnimating && (
                     <div className="pending-entry-alert">
@@ -3746,6 +4305,19 @@ export default function App() {
                       <p className="scan-result-message" style={{ color: '#f59e0b', fontSize: '0.9rem', fontWeight: '700' }}>{scanState.subMessage}</p>
                       <button className="btn-primary" style={{ width: '100%', marginTop: '1rem' }} onClick={handleScanAgain}>
                         OK — Will Scan Again to Exit
+                      </button>
+                    </div>
+                  )}
+
+                  {/* GEOLOCATION ERROR */}
+                  {scanState.type === 'geo_error' && (
+                    <div className="scan-result-card error">
+                      <div className="scan-result-icon error-icon" style={{ background: 'rgba(239, 68, 68, 0.15)', color: 'var(--error)' }}>{scanState.icon}</div>
+                      <h2 className="scan-result-title">{scanState.title}</h2>
+                      <p className="scan-result-message">{scanState.message}</p>
+                      <p className="scan-result-message" style={{ fontSize: '0.82rem', color: 'var(--text-dim)', marginTop: '0.5rem' }}>{scanState.subMessage}</p>
+                      <button className="btn-secondary" style={{ width: '100%', marginTop: '1.5rem' }} onClick={handleScanAgain}>
+                        Try Again
                       </button>
                     </div>
                   )}
@@ -4411,6 +4983,9 @@ export default function App() {
             </div>
           </div>
         )}
+
+        {/* MODAL 3: ADJUST SCHEDULE TIMETABLE SLOT */}
+        {renderAdjustmentModal()}
 
         {toast && (
           <div className="toast-container">

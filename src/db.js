@@ -578,3 +578,73 @@ export async function validateProfessorLogin(loginId, password) {
   }
   return { isAuthenticated: false };
 }
+
+// ===================================================
+// SCHEDULE ADJUSTMENTS DATABASE APIS
+// ===================================================
+
+export async function getAdjustments(classId) {
+  if (db) {
+    try {
+      const q = query(collection(db, 'adjustments'), where('classId', '==', classId));
+      const snap = await getDocs(q);
+      const list = [];
+      snap.forEach(docSnap => {
+        list.push(docSnap.data());
+      });
+      localStorage.setItem(`attendx_adjustments_${classId}`, JSON.stringify(list));
+      return list;
+    } catch (err) {
+      console.error("Firebase getAdjustments failed, using local storage:", err);
+    }
+  }
+  const local = localStorage.getItem(`attendx_adjustments_${classId}`);
+  return local ? JSON.parse(local) : [];
+}
+
+export async function saveAdjustment(adjData) {
+  const targetId = adjData.id || `adj_${Date.now()}`;
+  const cleanAdj = {
+    id: targetId,
+    classId: adjData.classId,
+    periodId: adjData.periodId,
+    date: adjData.date,
+    status: adjData.status,
+    rescheduledDate: adjData.rescheduledDate || null,
+    rescheduledStartTime: adjData.rescheduledStartTime || null,
+    rescheduledEndTime: adjData.rescheduledEndTime || null
+  };
+
+  const current = localStorage.getItem(`attendx_adjustments_${adjData.classId}`);
+  const list = current ? JSON.parse(current) : [];
+  const idx = list.findIndex(a => a.id === targetId);
+  if (idx !== -1) list[idx] = cleanAdj;
+  else list.push(cleanAdj);
+  localStorage.setItem(`attendx_adjustments_${adjData.classId}`, JSON.stringify(list));
+
+  if (db) {
+    try {
+      await setDoc(doc(db, 'adjustments', targetId), cleanAdj);
+    } catch (err) {
+      console.error("Firebase saveAdjustment failed, saved locally:", err);
+    }
+  }
+  return cleanAdj;
+}
+
+export async function deleteAdjustment(adjId, classId) {
+  const current = localStorage.getItem(`attendx_adjustments_${classId}`);
+  if (current) {
+    const list = JSON.parse(current).filter(a => a.id !== adjId);
+    localStorage.setItem(`attendx_adjustments_${classId}`, JSON.stringify(list));
+  }
+
+  if (db) {
+    try {
+      await deleteDoc(doc(db, 'adjustments', adjId));
+    } catch (err) {
+      console.error("Firebase deleteAdjustment failed, deleted locally:", err);
+    }
+  }
+  return true;
+}

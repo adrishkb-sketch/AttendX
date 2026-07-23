@@ -1139,6 +1139,21 @@ export default function App() {
     }
   };
 
+  const handleClearAllStudentLogs = async (studentId, classId, subject) => {
+    try {
+      const studentLogs = selectedProfStudent.logs || [];
+      for (const log of studentLogs) {
+        await deleteAttendanceLog(log.id);
+      }
+      await refreshSelectedStudentLogs(studentId, classId, subject);
+      await loadAllData();
+      triggerToast('All attendance logs for this student have been cleared!', 'success');
+    } catch (err) {
+      console.error("Failed to clear student logs:", err);
+      triggerToast('Failed to clear attendance logs.', 'error');
+    }
+  };
+
   const handleAddManualLog = async (studentId, classId, subject) => {
     if (!manualLogPeriodId) {
       triggerToast('Please select a period.', 'error');
@@ -2116,9 +2131,29 @@ export default function App() {
             </table>
           </div>
 
-          <button className="btn-secondary" style={{ width: '100%', marginTop: '1.25rem' }} onClick={() => setSelectedProfStudent(null)}>
-            Close Registry
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.25rem' }}>
+            <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setSelectedProfStudent(null)}>
+              Close Registry
+            </button>
+            {currentPage === 'admin' && (
+              <button 
+                className="btn-primary" 
+                style={{ 
+                  flex: 1, 
+                  background: 'linear-gradient(135deg, #ef4444, #b91c1c)', 
+                  border: 'none',
+                  boxShadow: 'none'
+                }} 
+                onClick={async () => {
+                  if (window.confirm(`Are you absolutely sure you want to permanently DELETE ALL attendance logs for ${selectedProfStudent.name}? This action CANNOT be undone!`)) {
+                    await handleClearAllStudentLogs(selectedProfStudent.id, currentClass.id, currentSub);
+                  }
+                }}
+              >
+                🗑️ Clear All Logs
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -3969,6 +4004,7 @@ export default function App() {
         )}
 
         {renderStudentLogsModal()}
+        {renderAdjustmentModal()}
 
         </main>
         

@@ -7,6 +7,7 @@ import {
 } from './db';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { drawStylishQR } from './qrHelper';
+import { Html5Qrcode } from 'html5-qrcode';
 
 // ===================================================
 // PURE UTILITY HELPER FUNCTIONS
@@ -276,6 +277,11 @@ export default function App() {
   const [rescheduleDate, setRescheduleDate] = useState(getTodayDate());
   const [rescheduleStartTime, setRescheduleStartTime] = useState('09:00');
   const [rescheduleEndTime, setRescheduleEndTime] = useState('10:00');
+
+  // Camera scanner states
+  const [isScanning, setIsScanning] = useState(false);
+  const [scannerError, setScannerError] = useState(null);
+  const html5QrCodeRef = useRef(null);
   // Derived filtered subjects and professors for the routine builder
   const filteredTheorySubjects = subjects.filter(s => s.department === theoryDept && s.type === 'Theory');
   const filteredTheoryProfs = professors.filter(p => p.department === theoryDept && p.subjects.some(sub => sub.id === (theorySubjectId || (filteredTheorySubjects[0]?.id))));
@@ -952,6 +958,98 @@ export default function App() {
     }
 
     return { type: 'error', message: 'Could not determine current class. Try again or contact admin.' };
+  };
+
+  /** Start standard camera-based QR scanner using html5-qrcode */
+  const startCameraScanner = async () => {
+    setScannerError(null);
+    setIsScanning(true);
+
+    // Wait for the reader element to mount
+    setTimeout(() => {
+      try {
+        const html5QrCode = new Html5Qrcode("reader");
+        html5QrCodeRef.current = html5QrCode;
+
+        html5QrCode.start(
+          { facingMode: "environment" },
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 250 }
+          },
+          async (qrMessage) => {
+            await handleSuccessfulScan(qrMessage);
+          },
+          (err) => {
+            // Silent debug failures
+          }
+        ).catch(err => {
+          console.error("Camera start error:", err);
+          setScannerError("Camera permission denied or no camera found. Please verify permissions.");
+        });
+      } catch (err) {
+        console.error("Scanner setup failed:", err);
+        setScannerError("Failed to initialize scanner. Try refreshing the page.");
+      }
+    }, 120);
+  };
+
+  /** Stop the camera QR scanner stream */
+  const stopCameraScanner = async () => {
+    if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
+      try {
+        await html5QrCodeRef.current.stop();
+      } catch (err) {
+        console.error("Failed to stop scanner:", err);
+      }
+    }
+    html5QrCodeRef.current = null;
+    setIsScanning(false);
+  };
+
+  /** Handle successfully parsed scanned QR text */
+  const handleSuccessfulScan = async (qrMessage) => {
+    // 1. Instantly stop the camera feed
+    await stopCameraScanner();
+
+    // 2. Animate and check geofence range
+    setScanAnimating(true);
+    setGeoChecking(true);
+
+    try {
+      let geoResult = { inRange: true, distance: 0 };
+      if (!mockGcectLocation) {
+        geoResult = await checkGeofence();
+      }
+
+      setScanAnimating(false);
+      setGeoChecking(false);
+
+      if (!geoResult.inRange) {
+        setScanState({
+          type: 'geo_error',
+          icon: '📍',
+          title: 'Out of Campus Range',
+          message: `You are currently ${geoResult.distance} meters away from the GCECT campus.`,
+          subMessage: `Attendance scans are restricted to GCECT campus radius (200m). Please scan inside the campus.`
+        });
+        return;
+      }
+
+      // 3. Process the scanned QR data payload
+      const result = await processQRScan(qrMessage, activeStudentInfo);
+      setScanState(result);
+    } catch (err) {
+      setScanAnimating(false);
+      setGeoChecking(false);
+      setScanState({
+        type: 'geo_error',
+        icon: '📍',
+        title: 'Location Access Required',
+        message: 'Could not access your location. Please grant GPS permission to verify you are on campus.',
+        subMessage: err.message || 'Location lookup timed out.'
+      });
+    }
   };
 
   /** Handle the simulate-scan button press */
@@ -4129,7 +4227,7 @@ export default function App() {
 
                   <button
                     className={`btn-scan-qr ${scanAnimating ? 'disabled' : ''}`}
-                    onClick={handleSimulateScan}
+                    onClick={startCameraScanner}
                     disabled={scanAnimating}
                     id="scanQRBtn"
                   >
@@ -4138,11 +4236,73 @@ export default function App() {
                       <path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
                       <rect x="7" y="7" width="10" height="10" rx="1"/>
                     </svg>
-                    {scanAnimating ? 'Scanning...' : (pendingEntry ? 'Scan to Exit Class' : 'Scan QR to Enter Class')}
+                    {scanAnimating ? 'Scanning...' : (pendingEntry ? '📷 Open Camera to Exit Class' : '📷 Open Camera to Scan QR')}
                   </button>
-                  <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '0.5rem' }}>
-                    Simulates scanning the physical QR poster in your classroom
-                  </p>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.75rem', alignItems: 'center' }}>
+                    <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', margin: 0 }}>
+                      Uses device camera to scan the official AttendX QR poster.
+                    </p>
+                    <button 
+                      type="button" 
+                      onClick={handleSimulateScan}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--primary-light)', fontSize: '0.72rem', textDecoration: 'underline', cursor: 'pointer' }}
+                    >
+                      ⚡ Bypass & Simulate QR Scan (Developer Option)
+                    </button>
+                  </div>
+
+                  {/* CAMERA OVERLAY MODAL */}
+                  {isScanning && (
+                    <div className="login-modal-overlay active" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: '1rem' }}>
+                      <div className="login-modal-box animate-scale-up" style={{ width: '100%', maxWidth: '440px', padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1rem', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                        <div className="modal-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
+                          <span className="logo-text" style={{ fontSize: '1.05rem', fontWeight: '900', color: 'var(--primary-light)' }}>
+                            📷 Camera QR Scanner
+                          </span>
+                          <button 
+                            type="button" 
+                            className="modal-close" 
+                            onClick={stopCameraScanner}
+                            style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', fontSize: '1.25rem', cursor: 'pointer' }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, textAlign: 'center' }}>
+                          Please point your camera at the QR code displayed on the professor's screen.
+                        </p>
+
+                        <div 
+                          id="reader" 
+                          style={{ 
+                            width: '100%', 
+                            borderRadius: '12px', 
+                            overflow: 'hidden', 
+                            background: '#0a0a0e', 
+                            border: '1.5px solid var(--border)',
+                            boxShadow: 'inset 0 0 10px rgba(0,0,0,0.8)'
+                          }}
+                        ></div>
+
+                        {scannerError && (
+                          <div style={{ color: '#ef4444', fontSize: '0.72rem', textAlign: 'center', background: 'rgba(239, 68, 68, 0.08)', padding: '0.5rem', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
+                            ⚠️ {scannerError}
+                          </div>
+                        )}
+
+                        <button 
+                          type="button" 
+                          className="btn-secondary" 
+                          onClick={stopCameraScanner}
+                          style={{ width: '100%', padding: '0.55rem', fontSize: '0.8rem' }}
+                        >
+                          Cancel Scanning
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 /* SCAN RESULT DISPLAY */

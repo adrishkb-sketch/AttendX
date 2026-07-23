@@ -124,51 +124,33 @@ export default function App() {
   useEffect(() => {
     loadAllData();
 
-    // Subscribe to realtime database updates if Supabase is active
-    let channel = null;
-    const client = getSupabaseClient();
-    if (client) {
-      channel = client
-        .channel('schema-db-changes')
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'classes' },
-          (payload) => {
-            console.log('Realtime classes update:', payload);
-            loadAllData();
-          }
-        )
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'students' },
-          (payload) => {
-            console.log('Realtime students update:', payload);
-            loadAllData();
-          }
-        )
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'subjects' },
-          (payload) => {
-            console.log('Realtime subjects update:', payload);
-            loadAllData();
-          }
-        )
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'professors' },
-          (payload) => {
-            console.log('Realtime professors update:', payload);
-            loadAllData();
-          }
-        )
-        .subscribe();
+    // Subscribe to realtime database updates if Firebase is active
+    const db = getFirestoreDb();
+    const unsubscribes = [];
+    
+    if (db) {
+      try {
+        const collections = ['classes', 'students', 'subjects', 'professors'];
+        collections.forEach(colName => {
+          const unsub = onSnapshot(
+            collection(db, colName),
+            (snapshot) => {
+              console.log(`Realtime Firestore ${colName} update received`);
+              loadAllData();
+            },
+            (error) => {
+              console.warn(`Firestore listener for ${colName} error (security rules):`, error);
+            }
+          );
+          unsubscribes.push(unsub);
+        });
+      } catch (err) {
+        console.warn("Failed to subscribe to Firestore collections:", err);
+      }
     }
 
     return () => {
-      if (client && channel) {
-        client.removeChannel(channel);
-      }
+      unsubscribes.forEach(unsub => unsub());
     };
   }, []);
 

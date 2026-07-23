@@ -8,6 +8,149 @@ import {
 import { collection, onSnapshot } from 'firebase/firestore';
 import { drawStylishQR } from './qrHelper';
 
+// ===================================================
+// PURE UTILITY HELPER FUNCTIONS
+// ===================================================
+
+/** Convert "HH:MM" string to total minutes from midnight */
+const timeToMinutes = (timeStr) => {
+  if (!timeStr) return 0;
+  const [h, m] = timeStr.split(':').map(Number);
+  return h * 60 + m;
+};
+
+/** Format minutes-from-midnight to "HH:MM AM/PM" */
+const minutesToDisplay = (minutes) => {
+  const h = Math.floor(minutes / 60) % 24;
+  const m = minutes % 60;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hh = h % 12 === 0 ? 12 : h % 12;
+  return `${hh}:${m.toString().padStart(2, '0')} ${ampm}`;
+};
+
+/** Format an ISO timestamp to readable time "HH:MM AM/PM" */
+const formatTime = (isoStr) => {
+  if (!isoStr) return '—';
+  const d = new Date(isoStr);
+  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+};
+
+/** Format an ISO timestamp to "DD MMM YYYY" */
+const formatDate = (isoStr) => {
+  if (!isoStr) return '—';
+  const d = new Date(isoStr);
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+/** Get today's day name e.g. "Monday" */
+const getTodayDayName = () => {
+  return new Date().toLocaleDateString('en-US', { weekday: 'long' });
+};
+
+/** Get today's date as YYYY-MM-DD */
+const getTodayDate = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+};
+
+/** Get day name from YYYY-MM-DD e.g. "Monday" */
+const getDayNameFromDate = (dateStr) => {
+  const d = new Date(dateStr);
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return days[d.getDay()];
+};
+
+/** Calculate distance between two coordinates using Haversine formula */
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371e3; // Earth radius in meters
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c; // In meters
+};
+
+const GCECT_LAT = 22.56486;
+const GCECT_LON = 88.39114;
+const GCECT_RADIUS_METERS = 200;
+
+/** Check if student current location is inside GCECT campus geofence */
+const checkGeofence = () => {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Geolocation is not supported by your browser."));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const dist = calculateDistance(latitude, longitude, GCECT_LAT, GCECT_LON);
+        resolve({
+          inRange: dist <= GCECT_RADIUS_METERS,
+          distance: Math.round(dist),
+          latitude,
+          longitude
+        });
+      },
+      (error) => {
+        reject(error);
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+    );
+  });
+};
+
+/** Check if a rescheduled slot overlaps with active classes */
+const checkOverlapForRescheduling = (currentClass, targetDate, startStr, endStr, classAdjustments, excludePeriodId = null) => {
+  const newStart = timeToMinutes(startStr);
+  const newEnd = timeToMinutes(endStr);
+  const dayName = getDayNameFromDate(targetDate);
+  
+  // 1. Check routine periods on this weekday
+  const routinePeriods = currentClass.routine || [];
+  const weekdayPeriods = routinePeriods.filter(p => p.day === dayName);
+  
+  const hasRoutineOverlap = weekdayPeriods.some(p => {
+    if (excludePeriodId && p.id === excludePeriodId) return false;
+    const pStart = timeToMinutes(p.startTime);
+    const pEnd = timeToMinutes(p.endTime);
+    const overlaps = (newStart < pEnd && newEnd > pStart);
+    
+    if (overlaps) {
+      // Overlaps routine, check if routine period is vacated (cancelled or rescheduled away) on this date
+      const isVacated = classAdjustments.some(adj => 
+        adj.periodId === p.id && 
+        adj.date === targetDate && 
+        (adj.status === 'cancelled' || adj.status === 'rescheduled')
+      );
+      return !isVacated;
+    }
+    return false;
+  });
+
+  if (hasRoutineOverlap) return true;
+
+  // 2. Check other rescheduled classes on this date
+  const hasRescheduledOverlap = classAdjustments.some(adj => {
+    if (adj.date === targetDate && adj.status === 'rescheduled') {
+      if (excludePeriodId && adj.periodId === excludePeriodId) return false;
+      const adjStart = timeToMinutes(adj.rescheduledStartTime);
+      const adjEnd = timeToMinutes(adj.rescheduledEndTime);
+      return (newStart < adjEnd && newEnd > adjStart);
+    }
+    return false;
+  });
+
+  return hasRescheduledOverlap;
+};
+
 export default function App() {
   // Page states
   const [currentPage, setCurrentPage] = useState('landing'); // landing | admin | student_dashboard | professor_dashboard
@@ -415,144 +558,6 @@ export default function App() {
   // ===================================================
   // ATTENDANCE PERIOD DETECTION ENGINE
   // ===================================================
-
-  /** Convert "HH:MM" string to total minutes from midnight */
-  const timeToMinutes = (timeStr) => {
-    const [h, m] = timeStr.split(':').map(Number);
-    return h * 60 + m;
-  };
-
-  /** Format minutes-from-midnight to "HH:MM AM/PM" */
-  const minutesToDisplay = (minutes) => {
-    const h = Math.floor(minutes / 60) % 24;
-    const m = minutes % 60;
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    const hh = h % 12 === 0 ? 12 : h % 12;
-    return `${hh}:${m.toString().padStart(2, '0')} ${ampm}`;
-  };
-
-  /** Format an ISO timestamp to readable time "HH:MM AM/PM" */
-  const formatTime = (isoStr) => {
-    if (!isoStr) return '—';
-    const d = new Date(isoStr);
-    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-  };
-
-  /** Format an ISO timestamp to "DD MMM YYYY" */
-  const formatDate = (isoStr) => {
-    if (!isoStr) return '—';
-    const d = new Date(isoStr);
-    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-  };
-
-  /** Get today's day name e.g. "Monday" */
-  const getTodayDayName = () => {
-    return new Date().toLocaleDateString('en-US', { weekday: 'long' });
-  };
-
-  /** Get today's date as YYYY-MM-DD */
-  const getTodayDate = () => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  };
-
-  /** Get day name from YYYY-MM-DD e.g. "Monday" */
-  const getDayNameFromDate = (dateStr) => {
-    const d = new Date(dateStr);
-    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    return days[d.getDay()];
-  };
-
-  /** Calculate distance between two coordinates using Haversine formula */
-  const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371e3; // Earth radius in meters
-    const φ1 = lat1 * Math.PI / 180;
-    const φ2 = lat2 * Math.PI / 180;
-    const Δφ = (lat2 - lat1) * Math.PI / 180;
-    const Δλ = (lon2 - lon1) * Math.PI / 180;
-
-    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-    return R * c; // In meters
-  };
-
-  /** Check if the student's current location is inside GCECT campus */
-  const GCECT_LAT = 22.56486;
-  const GCECT_LON = 88.39114;
-  const GCECT_RADIUS_METERS = 200;
-
-  const checkGeofence = () => {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error("Geolocation is not supported by your browser."));
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          const dist = calculateDistance(latitude, longitude, GCECT_LAT, GCECT_LON);
-          resolve({
-            inRange: dist <= GCECT_RADIUS_METERS,
-            distance: Math.round(dist),
-            latitude,
-            longitude
-          });
-        },
-        (error) => {
-          reject(error);
-        },
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-      );
-    });
-  };
-
-  /** Check if a rescheduled slot overlaps with active classes */
-  const checkOverlapForRescheduling = (currentClass, targetDate, startStr, endStr, excludePeriodId = null) => {
-    const newStart = timeToMinutes(startStr);
-    const newEnd = timeToMinutes(endStr);
-    const dayName = getDayNameFromDate(targetDate);
-    
-    // 1. Check routine periods on this weekday
-    const routinePeriods = currentClass.routine || [];
-    const weekdayPeriods = routinePeriods.filter(p => p.day === dayName);
-    
-    const hasRoutineOverlap = weekdayPeriods.some(p => {
-      if (excludePeriodId && p.id === excludePeriodId) return false;
-      const pStart = timeToMinutes(p.startTime);
-      const pEnd = timeToMinutes(p.endTime);
-      const overlaps = (newStart < pEnd && newEnd > pStart);
-      
-      if (overlaps) {
-        // Overlaps routine, check if routine period is vacated (cancelled or rescheduled away) on this date
-        const isVacated = classAdjustments.some(adj => 
-          adj.periodId === p.id && 
-          adj.date === targetDate && 
-          (adj.status === 'cancelled' || adj.status === 'rescheduled')
-        );
-        return !isVacated;
-      }
-      return false;
-    });
-
-    if (hasRoutineOverlap) return true;
-
-    // 2. Check other rescheduled classes on this date
-    const hasRescheduledOverlap = classAdjustments.some(adj => {
-      if (adj.date === targetDate && adj.status === 'rescheduled') {
-        if (excludePeriodId && adj.periodId === excludePeriodId) return false;
-        const adjStart = timeToMinutes(adj.rescheduledStartTime);
-        const adjEnd = timeToMinutes(adj.rescheduledEndTime);
-        return (newStart < adjEnd && newEnd > adjStart);
-      }
-      return false;
-    });
-
-    return hasRescheduledOverlap;
-  };
 
   /**
    * Core period resolution. Given a routine and the current time, returns:
@@ -1615,6 +1620,7 @@ export default function App() {
           rescheduleDate, 
           rescheduleStartTime, 
           rescheduleEndTime, 
+          classAdjustments,
           adjustmentModalPeriod.id
         );
 

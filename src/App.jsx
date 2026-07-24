@@ -432,6 +432,10 @@ export default function App() {
     const adminSession = localStorage.getItem('attendx_admin_session');
     if (adminSession === 'true') {
       setCurrentPage('admin');
+      getAllAttendanceLogs().then(logs => {
+        setProfAllAttendanceLogs(logs);
+        setAttendanceLogs(logs);
+      });
     } else {
       const studentSession = localStorage.getItem('attendx_student_session');
       if (studentSession) {
@@ -450,7 +454,10 @@ export default function App() {
             const parsed = JSON.parse(profSession);
             setActiveProfessorInfo(parsed);
             setCurrentPage('professor_dashboard');
-            getAllAttendanceLogs().then(logs => setProfAllAttendanceLogs(logs));
+            getAllAttendanceLogs().then(logs => {
+              setProfAllAttendanceLogs(logs);
+              setAttendanceLogs(logs);
+            });
           } catch (e) {
             console.error("Failed to restore professor session", e);
           }
@@ -601,7 +608,9 @@ export default function App() {
     const professorsData = await getProfessors();
     setProfessors(professorsData || []);
 
-    setProfAllAttendanceLogs(await getAllAttendanceLogs());
+    const logs = await getAllAttendanceLogs();
+    setProfAllAttendanceLogs(logs);
+    setAttendanceLogs(logs);
   };
 
   // Monitor scroll for navbar styles
@@ -641,6 +650,7 @@ export default function App() {
         if (currentPage === 'professor_dashboard' || currentPage === 'admin') {
           const allLogs = await getAllAttendanceLogs();
           setProfAllAttendanceLogs(allLogs);
+          setAttendanceLogs(allLogs);
           
           if (selectedProfStudent && selectedProfClass) {
             const currentClass = classes.find(c => c.id === selectedProfClass.id);
@@ -691,6 +701,25 @@ export default function App() {
       unsubscribeAdjustments();
     };
   }, [currentPage, activeStudentInfo, selectedProfStudent, selectedProfClass, selectedProfSubject, classes]);
+
+  // Sync changes to localStorage across tabs in local storage fallback mode
+  useEffect(() => {
+    const handleStorageChange = async (e) => {
+      if (e.key === 'attendx_attendance') {
+        console.log("Local storage attendance logs changed, syncing...");
+        const allLogs = await getAllAttendanceLogs();
+        setProfAllAttendanceLogs(allLogs);
+        if (currentPage === 'admin' || currentPage === 'professor_dashboard') {
+          setAttendanceLogs(allLogs);
+        }
+        if (currentPage === 'student_dashboard' && activeStudentInfo) {
+          await refreshAttendanceLogs(activeStudentInfo.student.id);
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [currentPage, activeStudentInfo]);
 
   useEffect(() => {
     const fetchClassAdjustments = async () => {
@@ -1588,7 +1617,7 @@ export default function App() {
 
         {/* Tab switcher for Professor Portal */}
         {isProfessorView && (
-          <div className="tab-menu" style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.25rem' }}>
+          <div className="tab-menu" style={{ display: 'flex', gap: '0.25rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.25rem', flexWrap: 'wrap' }}>
             <button 
               type="button" 
               className={`tab-link ${profDetailTab === 'registry' ? 'active' : ''}`}
@@ -1598,16 +1627,38 @@ export default function App() {
                 border: 'none', 
                 color: profDetailTab === 'registry' ? 'var(--primary-light)' : 'var(--text-dim)', 
                 borderBottom: profDetailTab === 'registry' ? '2.5px solid var(--primary-light)' : 'none', 
-                padding: '0.6rem 1.25rem', 
+                padding: '0.6rem 1rem', 
                 fontWeight: 700, 
-                fontSize: '0.88rem', 
+                fontSize: '0.85rem', 
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.35rem'
+                gap: '0.35rem',
+                whiteSpace: 'nowrap'
               }}
             >
               <SmartIcon name="user" size={13} /> Student Registry
+            </button>
+            <button 
+              type="button" 
+              className={`tab-link ${profDetailTab === 'today_attendance' ? 'active' : ''}`}
+              onClick={() => setProfDetailTab('today_attendance')}
+              style={{ 
+                background: 'transparent', 
+                border: 'none', 
+                color: profDetailTab === 'today_attendance' ? 'var(--primary-light)' : 'var(--text-dim)', 
+                borderBottom: profDetailTab === 'today_attendance' ? '2.5px solid var(--primary-light)' : 'none', 
+                padding: '0.6rem 1rem', 
+                fontWeight: 700, 
+                fontSize: '0.85rem', 
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <SmartIcon name="check" size={13} /> Today's Attendance
             </button>
             <button 
               type="button" 
@@ -1618,13 +1669,14 @@ export default function App() {
                 border: 'none', 
                 color: profDetailTab === 'schedule' ? 'var(--primary-light)' : 'var(--text-dim)', 
                 borderBottom: profDetailTab === 'schedule' ? '2.5px solid var(--primary-light)' : 'none', 
-                padding: '0.6rem 1.25rem', 
+                padding: '0.6rem 1rem', 
                 fontWeight: 700, 
-                fontSize: '0.88rem', 
+                fontSize: '0.85rem', 
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.35rem'
+                gap: '0.35rem',
+                whiteSpace: 'nowrap'
               }}
             >
               <SmartIcon name="calendar" size={13} /> Timetable &amp; Adjustments
@@ -1741,6 +1793,299 @@ export default function App() {
               </div>
             </div>
           </>
+        )}
+
+        {/* CONDITIONAL SECTION C: TODAY'S ATTENDANCE CHECKLIST */}
+        {isProfessorView && profDetailTab === 'today_attendance' && (
+          <div className="analytics-section-card animate-fade-in" style={{ padding: '1.5rem' }}>
+            {/* Header section */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div>
+                <h3 className="analytics-section-title" style={{ margin: 0 }}>
+                  Today's Attendance Checklist
+                </h3>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0.25rem 0 0 0' }}>
+                  Live student roster for {formatDate(getTodayDate())} (Subject: <strong>{currentSub?.name}</strong>)
+                </p>
+              </div>
+
+              {/* Search input field */}
+              <div style={{ position: 'relative', width: '100%', maxWidth: '280px' }}>
+                <input
+                  type="text"
+                  className="form-input search-input"
+                  style={{ width: '100%', padding: '0.45rem 1rem 0.45rem 2rem', fontSize: '0.85rem', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text)' }}
+                  placeholder="Search student or roll..."
+                  value={profSearchQuery}
+                  onChange={(e) => setProfSearchQuery(e.target.value)}
+                />
+                <span style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)', fontSize: '0.9rem' }}>🔍</span>
+              </div>
+            </div>
+
+            {/* Compute statistics and list */}
+            {(() => {
+              const today = getTodayDate();
+              const todayLogs = profAllAttendanceLogs.filter(
+                log => log.date === today && log.classId === currentClass.id && (log.subjectId === currentSub?.id || log.subjectName === currentSub?.name)
+              );
+              const resolvedStudents = currentClass.students.map(student => {
+                const log = todayLogs.find(l => l.studentId === student.id);
+                let status = 'absent';
+                if (log) {
+                  if (log.status === 'present') status = 'present';
+                  else if (log.status === 'pending') status = 'pending';
+                  else if (log.status === 'absent_no_exit') status = 'incomplete';
+                }
+                return { student, status, log };
+              });
+
+              const filteredList = resolvedStudents.filter(item => {
+                const query = profSearchQuery.toLowerCase();
+                return item.student.name.toLowerCase().includes(query) || item.student.roll.toLowerCase().includes(query);
+              });
+
+              const presentCount = resolvedStudents.filter(item => item.status === 'present' || item.status === 'pending').length;
+              const absentCount = resolvedStudents.length - presentCount;
+              const pct = resolvedStudents.length > 0 ? Math.round((presentCount / resolvedStudents.length) * 100) : 0;
+
+              return (
+                <>
+                  {/* Summary metric banner */}
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', 
+                    gap: '1rem', 
+                    marginBottom: '1.5rem', 
+                    background: 'rgba(255,255,255,0.02)', 
+                    padding: '1rem', 
+                    borderRadius: '12px', 
+                    border: '1px solid var(--border)' 
+                  }}>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--accent)' }}>{presentCount}</div>
+                      <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-dim)', fontWeight: 700, marginTop: '2px' }}>Present Today</div>
+                    </div>
+                    <div style={{ textAlign: 'center', borderLeft: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--error)' }}>{absentCount}</div>
+                      <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-dim)', fontWeight: 700, marginTop: '2px' }}>Absent Today</div>
+                    </div>
+                    <div style={{ textAlign: 'center', borderLeft: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--primary-light)' }}>{pct}%</div>
+                      <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-dim)', fontWeight: 700, marginTop: '2px' }}>Attendance Rate</div>
+                    </div>
+                  </div>
+
+                  {/* List of cards */}
+                  {filteredList.length === 0 ? (
+                    <div className="analytics-empty-state" style={{ padding: '2rem 1rem' }}>
+                      <span style={{ fontSize: '2rem' }}>👥</span>
+                      <p>No students match the search query.</p>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem' }}>
+                      {filteredList.map(({ student, status, log }) => {
+                        return (
+                          <div 
+                            key={student.id} 
+                            style={{ 
+                              background: 'var(--bg-2)', 
+                              border: '1px solid var(--border)', 
+                              borderRadius: '12px', 
+                              padding: '1rem', 
+                              display: 'flex', 
+                              flexDirection: 'column',
+                              justifyContent: 'space-between',
+                              gap: '0.75rem',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                              <div style={{ 
+                                width: '38px', 
+                                height: '38px', 
+                                borderRadius: '50%', 
+                                background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', 
+                                color: '#ffffff', 
+                                fontWeight: 700, 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center',
+                                fontSize: '0.9rem' 
+                              }}>
+                                {student.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {student.name}
+                                </div>
+                                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                  Roll: {student.roll} · Group {student.group}
+                                </div>
+                              </div>
+                              
+                              {/* Custom Colored Badges */}
+                              <div>
+                                {status === 'present' ? (
+                                  <span style={{ 
+                                    background: 'rgba(16,185,129,0.12)', 
+                                    color: 'var(--accent)', 
+                                    border: '1px solid rgba(16,185,129,0.25)', 
+                                    fontSize: '0.7rem', 
+                                    fontWeight: 800, 
+                                    padding: '0.25rem 0.65rem', 
+                                    borderRadius: '99px',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px'
+                                  }}>
+                                    ✓ Present
+                                  </span>
+                                ) : status === 'pending' ? (
+                                  <span style={{ 
+                                    background: 'rgba(245,158,11,0.12)', 
+                                    color: '#f59e0b', 
+                                    border: '1px solid rgba(245,158,11,0.25)', 
+                                    fontSize: '0.7rem', 
+                                    fontWeight: 800, 
+                                    padding: '0.25rem 0.65rem', 
+                                    borderRadius: '99px',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px'
+                                  }}>
+                                    ⏳ Active
+                                  </span>
+                                ) : status === 'incomplete' ? (
+                                  <span style={{ 
+                                    background: 'rgba(239,68,68,0.12)', 
+                                    color: '#f87171', 
+                                    border: '1px solid rgba(239,68,68,0.25)', 
+                                    fontSize: '0.7rem', 
+                                    fontWeight: 800, 
+                                    padding: '0.25rem 0.65rem', 
+                                    borderRadius: '99px',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px'
+                                  }}>
+                                    Incomplete
+                                  </span>
+                                ) : (
+                                  <span style={{ 
+                                    background: 'rgba(239,68,68,0.08)', 
+                                    color: '#f87171', 
+                                    border: '1px solid rgba(239,68,68,0.15)', 
+                                    fontSize: '0.7rem', 
+                                    fontWeight: 800, 
+                                    padding: '0.25rem 0.65rem', 
+                                    borderRadius: '99px',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px'
+                                  }}>
+                                    ✗ Absent
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Scan Times */}
+                            <div style={{ 
+                              background: 'rgba(255,255,255,0.01)', 
+                              border: '1px dashed var(--border)', 
+                              borderRadius: '8px', 
+                              padding: '0.5rem 0.75rem', 
+                              fontSize: '0.72rem', 
+                              color: 'var(--text-dim)', 
+                              display: 'flex', 
+                              justifyContent: 'space-between',
+                              alignItems: 'center'
+                            }}>
+                              <span>
+                                {log ? (
+                                  <>In: <strong style={{ color: 'var(--text)' }}>{formatTime(log.entryTime)}</strong></>
+                                ) : (
+                                  <span style={{ color: 'var(--text-muted)' }}>No session scan today</span>
+                                )}
+                              </span>
+                              <span>
+                                {log?.exitTime ? (
+                                  <>Out: <strong style={{ color: 'var(--text)' }}>{formatTime(log.exitTime)}</strong></>
+                                ) : log ? (
+                                  <span style={{ color: '#f59e0b', fontWeight: '600' }}>Active in class</span>
+                                ) : (
+                                  ''
+                                )}
+                              </span>
+                            </div>
+
+                            {/* Actions block */}
+                            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                              {status === 'absent' ? (
+                                <button 
+                                  type="button" 
+                                  className="btn-primary" 
+                                  style={{ 
+                                    flex: 1, 
+                                    padding: '0.35rem 0.5rem', 
+                                    fontSize: '0.72rem', 
+                                    background: 'rgba(16,185,129,0.08)', 
+                                    border: '1px solid rgba(16,185,129,0.25)', 
+                                    color: 'var(--accent)', 
+                                    boxShadow: 'none',
+                                    borderRadius: '8px'
+                                  }}
+                                  onClick={async () => {
+                                    const nowISO = new Date().toISOString();
+                                    const record = {
+                                      studentId: student.id,
+                                      classId: currentClass.id,
+                                      periodId: 'manual',
+                                      subjectName: currentSub.name,
+                                      subjectId: currentSub.id,
+                                      periodStart: '—',
+                                      periodEnd: '—',
+                                      date: today,
+                                      entryTime: nowISO,
+                                      exitTime: nowISO,
+                                      status: 'present'
+                                    };
+                                    await saveAttendanceEntry(record);
+                                    setProfAllAttendanceLogs(await getAllAttendanceLogs());
+                                    triggerToast(`Marked ${student.name} as Present manually.`, 'success');
+                                  }}
+                                >
+                                  Mark Present
+                                </button>
+                              ) : (
+                                <button 
+                                  type="button" 
+                                  className="btn-secondary" 
+                                  style={{ 
+                                    flex: 1, 
+                                    padding: '0.35rem 0.5rem', 
+                                    fontSize: '0.72rem', 
+                                    color: 'var(--error)', 
+                                    borderRadius: '8px'
+                                  }}
+                                  onClick={async () => {
+                                    if (window.confirm(`Mark ${student.name} as Absent and remove today's scan log?`)) {
+                                      await deleteAttendanceLog(log.id);
+                                      setProfAllAttendanceLogs(await getAllAttendanceLogs());
+                                      triggerToast(`Marked ${student.name} as Absent manually.`, 'info');
+                                    }
+                                  }}
+                                >
+                                  Mark Absent
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
         )}
 
         {/* CONDITIONAL SECTION B: TIMETABLE & DAILY SCHEDULE ADJUSTMENTS */}
@@ -2421,6 +2766,9 @@ export default function App() {
       if (isAdmin) {
         localStorage.setItem('attendx_admin_session', 'true');
         triggerToast('Welcome Admin Adrish! Redirecting...', 'success');
+        const logs = await getAllAttendanceLogs();
+        setProfAllAttendanceLogs(logs);
+        setAttendanceLogs(logs);
         setCurrentPage('admin');
         closeLoginModal();
         resetClassCreatorForm(); // Reset creator form when admin logs in
@@ -2452,7 +2800,9 @@ export default function App() {
             setProfFilterStatus('all');
             setProfFilterGroup('all');
             setSelectedProfStudent(null);
-            setProfAllAttendanceLogs(await getAllAttendanceLogs());
+            const logs = await getAllAttendanceLogs();
+            setProfAllAttendanceLogs(logs);
+            setAttendanceLogs(logs);
             triggerToast(`Logged in successfully as ${authResult.professor.name}!`, 'success');
             setCurrentPage('professor_dashboard');
             closeLoginModal();

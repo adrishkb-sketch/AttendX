@@ -832,15 +832,18 @@ export default function App() {
       const endMin = timeToMinutes(p.endTime);
       const exitOpenMin = endMin - 5; // Exit window opens 5 min before end
 
-      // Is now within the main attendance window? (can enter up to endTime - 5min)
-      if (nowMinutes >= startMin - 15 && nowMinutes < exitOpenMin) {
+      // Is now within the main attendance window? (can enter up to class end)
+      if (nowMinutes >= startMin - 15 && nowMinutes < endMin) {
         currentPeriod = p;
+        if (nowMinutes >= exitOpenMin) {
+          exitWindowPeriod = p;
+        }
         nextPeriod = relevantPeriods[i + 1] || null;
         break;
       }
 
-      // Is now in the exit window? (last 5 min or after end, same day)
-      if (nowMinutes >= exitOpenMin && nowMinutes <= endMin + 15) {
+      // Is now in the post-class exit window? (after end, same day)
+      if (nowMinutes >= endMin && nowMinutes <= endMin + 15) {
         exitWindowPeriod = p;
         nextPeriod = relevantPeriods[i + 1] || null;
         break;

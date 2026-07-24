@@ -4080,146 +4080,299 @@ export default function App() {
                         <head>
                           <title>Attendance QR Poster - ${activeQRClass.name}</title>
                           <style>
-                            @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&family=Inter:wght@400;600&display=swap');
+                            @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap');
+                            
+                            @page {
+                              size: A4 portrait;
+                              margin: 0;
+                            }
+                            
                             body {
                               margin: 0;
                               padding: 0;
+                              width: 210mm;
+                              height: 297mm;
+                              box-sizing: border-box;
+                              font-family: 'Plus Jakarta Sans', sans-serif;
+                              background: #0b0f19; /* premium deep dark background */
+                              color: #f8fafc;
                               display: flex;
                               flex-direction: column;
                               align-items: center;
                               justify-content: space-between;
-                              height: 297mm; /* A4 height */
-                              width: 210mm;  /* A4 width */
-                              box-sizing: border-box;
-                              padding: 25mm;
-                              font-family: 'Outfit', sans-serif;
-                              background: #ffffff;
-                              color: #0f172a;
-                              text-align: center;
+                              position: relative;
+                              overflow: hidden;
+                              padding: 20mm;
                             }
+
+                            /* Decorative background blobs and patterns */
+                            .bg-gradient {
+                              position: absolute;
+                              top: -100mm;
+                              left: -100mm;
+                              width: 400mm;
+                              height: 400mm;
+                              background: radial-gradient(circle, rgba(124, 58, 237, 0.15) 0%, rgba(219, 39, 119, 0.05) 50%, transparent 100%);
+                              z-index: 1;
+                              pointer-events: none;
+                            }
+
+                            .bg-gradient-bottom {
+                              position: absolute;
+                              bottom: -150mm;
+                              right: -150mm;
+                              width: 350mm;
+                              height: 350mm;
+                              background: radial-gradient(circle, rgba(16, 185, 129, 0.12) 0%, rgba(59, 130, 246, 0.05) 60%, transparent 100%);
+                              z-index: 1;
+                              pointer-events: none;
+                            }
+
+                            /* Page decorative border frame */
+                            .page-frame {
+                              position: absolute;
+                              top: 10mm;
+                              left: 10mm;
+                              right: 10mm;
+                              bottom: 10mm;
+                              border: 2px solid rgba(255, 255, 255, 0.05);
+                              border-radius: 24px;
+                              z-index: 2;
+                              pointer-events: none;
+                            }
+
+                            .corner-decor {
+                              position: absolute;
+                              width: 30px;
+                              height: 30px;
+                              border: 4px solid #7c3aed;
+                              z-index: 3;
+                            }
+                            .c-tl { top: 8mm; left: 8mm; border-right: none; border-bottom: none; border-top-left-radius: 12px; }
+                            .c-tr { top: 8mm; right: 8mm; border-left: none; border-bottom: none; border-top-right-radius: 12px; }
+                            .c-bl { bottom: 8mm; left: 8mm; border-right: none; border-top: none; border-bottom-left-radius: 12px; }
+                            .c-br { bottom: 8mm; right: 8mm; border-left: none; border-top: none; border-bottom-right-radius: 12px; }
+
+                            .content-wrapper {
+                              position: relative;
+                              z-index: 10;
+                              width: 100%;
+                              height: 100%;
+                              display: flex;
+                              flex-direction: column;
+                              justify-content: space-between;
+                              align-items: center;
+                            }
+
                             .header {
+                              margin-top: 10mm;
                               display: flex;
                               flex-direction: column;
                               align-items: center;
-                              gap: 10px;
-                              margin-top: 10mm;
                             }
-                            .brand {
-                              font-size: 24px;
-                              font-weight: 900;
-                              color: #8b5cf6;
+
+                            .brand-pill {
+                              background: rgba(124, 58, 237, 0.15);
+                              border: 1px solid rgba(124, 58, 237, 0.3);
+                              padding: 8px 20px;
+                              border-radius: 50px;
+                              font-size: 14px;
+                              font-weight: 700;
+                              text-transform: uppercase;
+                              letter-spacing: 2px;
+                              color: #a78bfa;
+                              margin-bottom: 20px;
                               display: flex;
                               align-items: center;
                               gap: 8px;
-                              letter-spacing: -0.5px;
+                              box-shadow: 0 4px 12px rgba(124, 58, 237, 0.15);
                             }
+
                             .title {
-                              font-size: 44px;
+                              font-family: 'Outfit', sans-serif;
+                              font-size: 42px;
                               font-weight: 900;
-                              margin: 20px 0 5px 0;
-                              color: #0f172a;
-                              letter-spacing: -1.5px;
+                              margin: 0;
+                              letter-spacing: -1px;
                               line-height: 1.1;
                               text-transform: uppercase;
+                              background: linear-gradient(135deg, #f8fafc 30%, #cbd5e1 100%);
+                              -webkit-background-clip: text;
+                              -webkit-text-fill-color: transparent;
                             }
+
                             .subtitle {
-                              font-size: 18px;
-                              color: #64748b;
-                              font-family: 'Inter', sans-serif;
-                              font-weight: 500;
-                              max-width: 500px;
+                              font-size: 15px;
+                              color: #94a3b8;
+                              max-width: 480px;
+                              margin: 15px 0 0 0;
+                              line-height: 1.5;
                             }
+
                             .class-card {
-                              border: 2px solid #e2e8f0;
-                              border-radius: 16px;
-                              padding: 15px 30px;
                               margin-top: 25px;
-                              background: #f8fafc;
-                              display: inline-block;
+                              background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
+                              border: 1px solid rgba(255, 255, 255, 0.08);
+                              border-radius: 20px;
+                              padding: 20px 40px;
+                              box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+                              backdrop-filter: blur(10px);
+                              text-align: center;
+                              max-width: 520px;
                             }
+
                             .class-name {
+                              font-family: 'Outfit', sans-serif;
                               font-size: 32px;
                               font-weight: 900;
-                              color: #8b5cf6;
-                              margin-bottom: 5px;
+                              background: linear-gradient(135deg, #a78bfa 0%, #db2777 100%);
+                              -webkit-background-clip: text;
+                              -webkit-text-fill-color: transparent;
+                              margin-bottom: 8px;
                             }
+
                             .class-meta {
-                              font-size: 15px;
-                              color: #64748b;
-                              font-family: 'Inter', sans-serif;
+                              font-size: 14px;
+                              color: #94a3b8;
                               font-weight: 600;
+                              letter-spacing: 0.5px;
+                              text-transform: uppercase;
                             }
-                            .qr-container {
+
+                            .qr-outer-container {
                               margin: auto 0;
                               display: flex;
                               flex-direction: column;
                               align-items: center;
+                              justify-content: center;
+                            }
+
+                            .qr-frame-wrapper {
+                              padding: 24px;
+                              background: linear-gradient(135deg, #7c3aed, #db2777);
+                              border-radius: 36px;
+                              box-shadow: 0 25px 60px rgba(124, 58, 237, 0.35);
                               position: relative;
                             }
-                            .qr-frame {
-                              padding: 24px;
-                              border: 6px solid #8b5cf6;
-                              border-radius: 28px;
-                              background: #ffffff;
-                              box-shadow: 0 25px 50px rgba(139, 92, 246, 0.12);
+
+                            .qr-frame-wrapper::after {
+                              content: '';
+                              position: absolute;
+                              top: -3px; left: -3px; right: -3px; bottom: -3px;
+                              background: linear-gradient(135deg, #a78bfa, #f43f5e);
+                              border-radius: 39px;
+                              z-index: -1;
+                              opacity: 0.5;
                             }
+
+                            .qr-inner-white {
+                              background: #ffffff;
+                              padding: 16px;
+                              border-radius: 24px;
+                              display: flex;
+                              align-items: center;
+                              justify-content: center;
+                              box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.05);
+                            }
+
                             .qr-img {
-                              width: 360px;
-                              height: 360px;
+                              width: 320px;
+                              height: 320px;
                               display: block;
                             }
+
+                            .instructions-card {
+                              margin-top: 20px;
+                              display: flex;
+                              align-items: center;
+                              gap: 12px;
+                              background: rgba(16, 185, 129, 0.1);
+                              border: 1px solid rgba(16, 185, 129, 0.25);
+                              padding: 12px 24px;
+                              border-radius: 50px;
+                              color: #34d399;
+                              font-weight: 700;
+                              font-size: 14px;
+                              box-shadow: 0 4px 15px rgba(16, 185, 129, 0.1);
+                            }
+
                             .footer {
+                              margin-bottom: 8mm;
                               display: flex;
                               flex-direction: column;
                               align-items: center;
-                              gap: 15px;
-                              font-family: 'Inter', sans-serif;
-                              margin-bottom: 10mm;
+                              gap: 10px;
                             }
+
                             .footer-instruction {
-                              font-size: 20px;
-                              font-weight: 800;
-                              color: #1e293b;
-                              max-width: 520px;
+                              font-size: 16px;
+                              font-weight: 700;
+                              color: #cbd5e1;
+                              letter-spacing: 0.5px;
+                              text-transform: uppercase;
+                              max-width: 480px;
                               line-height: 1.4;
+                              text-align: center;
                             }
+
                             .footer-note {
-                              font-size: 12px;
-                              color: #94a3b8;
+                              font-size: 11px;
+                              color: #64748b;
                               font-weight: 500;
-                            }
-                            @media print {
-                              body {
-                                padding: 20mm;
-                              }
+                              letter-spacing: 1px;
+                              text-transform: uppercase;
                             }
                           </style>
                         </head>
                         <body>
-                          <div class="header">
-                            <div class="brand">◈ ATTENDX SYSTEM</div>
-                            <div class="title">SCAN FOR ATTENDANCE</div>
-                            <div class="subtitle">Scan this custom-styled QR code below using your student mobile portal to mark class attendance</div>
-                            <div class="class-card">
-                              <div class="class-name">${activeQRClass.name}</div>
-                              <div class="class-meta">${activeQRClass.program} &bull; Semester ${activeQRClass.semester} &bull; Batch ${activeQRClass.batchStart}-${activeQRClass.batchEnd}</div>
+                          <div class="bg-gradient"></div>
+                          <div class="bg-gradient-bottom"></div>
+                          
+                          <div class="page-frame"></div>
+                          <div class="corner-decor c-tl"></div>
+                          <div class="corner-decor c-tr"></div>
+                          <div class="corner-decor c-bl"></div>
+                          <div class="corner-decor c-br"></div>
+
+                          <div class="content-wrapper">
+                            <div class="header">
+                              <div class="brand-pill">
+                                <span style="font-size: 16px;">◈</span> AttendX Smart Portal
+                              </div>
+                              <h1 class="title">Scan to Mark Attendance</h1>
+                              <p class="subtitle">Please scan this secure QR code using the scanner in your student mobile application to register your class session attendance logs.</p>
+                              
+                              <div class="class-card">
+                                <div class="class-name">${activeQRClass.name}</div>
+                                <div class="class-meta">
+                                  ${activeQRClass.program} &bull; Sem ${activeQRClass.semester} &bull; Batch ${activeQRClass.batchStart}-${activeQRClass.batchEnd}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div class="qr-outer-container">
+                              <div class="qr-frame-wrapper">
+                                <div class="qr-inner-white">
+                                  <img class="qr-img" src="${qrDataUrl}" />
+                                </div>
+                              </div>
+                              
+                              <div class="instructions-card">
+                                <span style="display: inline-block; width: 8px; height: 8px; background: #10b981; border-radius: 50%; box-shadow: 0 0 10px #10b981;"></span>
+                                SYSTEM READY FOR REAL-TIME SCANS
+                              </div>
+                            </div>
+
+                            <div class="footer">
+                              <div class="footer-instruction">
+                                Remember to scan when entering the room and scan again upon session departure.
+                              </div>
+                              <div class="footer-note">
+                                System Generated &bull; Secure Real-time Attendance Network
+                              </div>
                             </div>
                           </div>
 
-                          <div class="qr-container">
-                            <div class="qr-frame">
-                              <img class="qr-img" src="${qrDataUrl}" />
-                            </div>
-                          </div>
-
-                          <div class="footer">
-                            <div class="footer-instruction">
-                              Scan while entering class and again scan once class is ended.
-                            </div>
-                            <div class="footer-note">
-                              Generated by AttendX System &bull; Live Realtime Attendance Tracker
-                            </div>
-                          </div>
                           <script>
                             window.onload = function() {
                               window.print();
@@ -5410,30 +5563,305 @@ export default function App() {
                         <head>
                           <title>Attendance QR Poster - ${activeQRClass.name}</title>
                           <style>
-                            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #fafafa; padding: 2rem; color: #1e1b4b; }
-                            .poster { background: #ffffff; padding: 3rem; border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.06); max-width: 500px; margin: 0 auto; border: 2px solid #e0e0e0; }
-                            .logo { font-size: 1.5rem; font-weight: 800; color: #6d28d9; letter-spacing: -0.5px; margin-bottom: 2rem; }
-                            .class-name { font-size: 2.2rem; font-weight: 900; margin: 0; }
-                            .class-meta { color: #64748b; font-size: 1rem; margin-top: 0.5rem; margin-bottom: 2rem; }
-                            .qr-container { padding: 1.5rem; border: 1px solid #e2e8f0; border-radius: 20px; display: inline-block; margin-bottom: 2rem; }
-                            .instructions { font-size: 1.1rem; color: #475569; line-height: 1.6; max-width: 380px; margin: 0 auto; }
-                            .footer { margin-top: 3rem; font-size: 0.85rem; color: #94a3b8; }
+                            @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap');
+                            
+                            @page {
+                              size: A4 portrait;
+                              margin: 0;
+                            }
+                            
+                            body {
+                              margin: 0;
+                              padding: 0;
+                              width: 210mm;
+                              height: 297mm;
+                              box-sizing: border-box;
+                              font-family: 'Plus Jakarta Sans', sans-serif;
+                              background: #0b0f19; /* premium deep dark background */
+                              color: #f8fafc;
+                              display: flex;
+                              flex-direction: column;
+                              align-items: center;
+                              justify-content: space-between;
+                              position: relative;
+                              overflow: hidden;
+                              padding: 20mm;
+                            }
+
+                            /* Decorative background blobs and patterns */
+                            .bg-gradient {
+                              position: absolute;
+                              top: -100mm;
+                              left: -100mm;
+                              width: 400mm;
+                              height: 400mm;
+                              background: radial-gradient(circle, rgba(124, 58, 237, 0.15) 0%, rgba(219, 39, 119, 0.05) 50%, transparent 100%);
+                              z-index: 1;
+                              pointer-events: none;
+                            }
+
+                            .bg-gradient-bottom {
+                              position: absolute;
+                              bottom: -150mm;
+                              right: -150mm;
+                              width: 350mm;
+                              height: 350mm;
+                              background: radial-gradient(circle, rgba(16, 185, 129, 0.12) 0%, rgba(59, 130, 246, 0.05) 60%, transparent 100%);
+                              z-index: 1;
+                              pointer-events: none;
+                            }
+
+                            /* Page decorative border frame */
+                            .page-frame {
+                              position: absolute;
+                              top: 10mm;
+                              left: 10mm;
+                              right: 10mm;
+                              bottom: 10mm;
+                              border: 2px solid rgba(255, 255, 255, 0.05);
+                              border-radius: 24px;
+                              z-index: 2;
+                              pointer-events: none;
+                            }
+
+                            .corner-decor {
+                              position: absolute;
+                              width: 30px;
+                              height: 30px;
+                              border: 4px solid #7c3aed;
+                              z-index: 3;
+                            }
+                            .c-tl { top: 8mm; left: 8mm; border-right: none; border-bottom: none; border-top-left-radius: 12px; }
+                            .c-tr { top: 8mm; right: 8mm; border-left: none; border-bottom: none; border-top-right-radius: 12px; }
+                            .c-bl { bottom: 8mm; left: 8mm; border-right: none; border-top: none; border-bottom-left-radius: 12px; }
+                            .c-br { bottom: 8mm; right: 8mm; border-left: none; border-top: none; border-bottom-right-radius: 12px; }
+
+                            .content-wrapper {
+                              position: relative;
+                              z-index: 10;
+                              width: 100%;
+                              height: 100%;
+                              display: flex;
+                              flex-direction: column;
+                              justify-content: space-between;
+                              align-items: center;
+                            }
+
+                            .header {
+                              margin-top: 10mm;
+                              display: flex;
+                              flex-direction: column;
+                              align-items: center;
+                            }
+
+                            .brand-pill {
+                              background: rgba(124, 58, 237, 0.15);
+                              border: 1px solid rgba(124, 58, 237, 0.3);
+                              padding: 8px 20px;
+                              border-radius: 50px;
+                              font-size: 14px;
+                              font-weight: 700;
+                              text-transform: uppercase;
+                              letter-spacing: 2px;
+                              color: #a78bfa;
+                              margin-bottom: 20px;
+                              display: flex;
+                              align-items: center;
+                              gap: 8px;
+                              box-shadow: 0 4px 12px rgba(124, 58, 237, 0.15);
+                            }
+
+                            .title {
+                              font-family: 'Outfit', sans-serif;
+                              font-size: 42px;
+                              font-weight: 900;
+                              margin: 0;
+                              letter-spacing: -1px;
+                              line-height: 1.1;
+                              text-transform: uppercase;
+                              background: linear-gradient(135deg, #f8fafc 30%, #cbd5e1 100%);
+                              -webkit-background-clip: text;
+                              -webkit-text-fill-color: transparent;
+                            }
+
+                            .subtitle {
+                              font-size: 15px;
+                              color: #94a3b8;
+                              max-width: 480px;
+                              margin: 15px 0 0 0;
+                              line-height: 1.5;
+                            }
+
+                            .class-card {
+                              margin-top: 25px;
+                              background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
+                              border: 1px solid rgba(255, 255, 255, 0.08);
+                              border-radius: 20px;
+                              padding: 20px 40px;
+                              box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+                              backdrop-filter: blur(10px);
+                              text-align: center;
+                              max-width: 520px;
+                            }
+
+                            .class-name {
+                              font-family: 'Outfit', sans-serif;
+                              font-size: 32px;
+                              font-weight: 900;
+                              background: linear-gradient(135deg, #a78bfa 0%, #db2777 100%);
+                              -webkit-background-clip: text;
+                              -webkit-text-fill-color: transparent;
+                              margin-bottom: 8px;
+                            }
+
+                            .class-meta {
+                              font-size: 14px;
+                              color: #94a3b8;
+                              font-weight: 600;
+                              letter-spacing: 0.5px;
+                              text-transform: uppercase;
+                            }
+
+                            .qr-outer-container {
+                              margin: auto 0;
+                              display: flex;
+                              flex-direction: column;
+                              align-items: center;
+                              justify-content: center;
+                            }
+
+                            .qr-frame-wrapper {
+                              padding: 24px;
+                              background: linear-gradient(135deg, #7c3aed, #db2777);
+                              border-radius: 36px;
+                              box-shadow: 0 25px 60px rgba(124, 58, 237, 0.35);
+                              position: relative;
+                            }
+
+                            .qr-frame-wrapper::after {
+                              content: '';
+                              position: absolute;
+                              top: -3px; left: -3px; right: -3px; bottom: -3px;
+                              background: linear-gradient(135deg, #a78bfa, #f43f5e);
+                              border-radius: 39px;
+                              z-index: -1;
+                              opacity: 0.5;
+                            }
+
+                            .qr-inner-white {
+                              background: #ffffff;
+                              padding: 16px;
+                              border-radius: 24px;
+                              display: flex;
+                              align-items: center;
+                              justify-content: center;
+                              box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.05);
+                            }
+
+                            .qr-img {
+                              width: 320px;
+                              height: 320px;
+                              display: block;
+                            }
+
+                            .instructions-card {
+                              margin-top: 20px;
+                              display: flex;
+                              align-items: center;
+                              gap: 12px;
+                              background: rgba(16, 185, 129, 0.1);
+                              border: 1px solid rgba(16, 185, 129, 0.25);
+                              padding: 12px 24px;
+                              border-radius: 50px;
+                              color: #34d399;
+                              font-weight: 700;
+                              font-size: 14px;
+                              box-shadow: 0 4px 15px rgba(16, 185, 129, 0.1);
+                            }
+
+                            .footer {
+                              margin-bottom: 8mm;
+                              display: flex;
+                              flex-direction: column;
+                              align-items: center;
+                              gap: 10px;
+                            }
+
+                            .footer-instruction {
+                              font-size: 16px;
+                              font-weight: 700;
+                              color: #cbd5e1;
+                              letter-spacing: 0.5px;
+                              text-transform: uppercase;
+                              max-width: 480px;
+                              line-height: 1.4;
+                              text-align: center;
+                            }
+
+                            .footer-note {
+                              font-size: 11px;
+                              color: #64748b;
+                              font-weight: 500;
+                              letter-spacing: 1px;
+                              text-transform: uppercase;
+                            }
                           </style>
                         </head>
                         <body>
-                          <div class="poster">
-                            <div class="logo">◈ AttendX</div>
-                            <div class="class-name">${activeQRClass.name}</div>
-                            <div class="class-meta">${activeQRClass.program} &bull; Semester ${activeQRClass.semester} &bull; Batch ${activeQRClass.batchStart}-${activeQRClass.batchEnd}</div>
-                            <div class="qr-container">
-                              <img src="${qrDataUrl}" style="width: 320px; height: 320px; display: block;" />
+                          <div class="bg-gradient"></div>
+                          <div class="bg-gradient-bottom"></div>
+                          
+                          <div class="page-frame"></div>
+                          <div class="corner-decor c-tl"></div>
+                          <div class="corner-decor c-tr"></div>
+                          <div class="corner-decor c-bl"></div>
+                          <div class="corner-decor c-br"></div>
+
+                          <div class="content-wrapper">
+                            <div class="header">
+                              <div class="brand-pill">
+                                <span style="font-size: 16px;">◈</span> AttendX Smart Portal
+                              </div>
+                              <h1 class="title">Scan to Mark Attendance</h1>
+                              <p class="subtitle">Please scan this secure QR code using the scanner in your student mobile application to register your class session attendance logs.</p>
+                              
+                              <div class="class-card">
+                                <div class="class-name">${activeQRClass.name}</div>
+                                <div class="class-meta">
+                                  ${activeQRClass.program} &bull; Sem ${activeQRClass.semester} &bull; Batch ${activeQRClass.batchStart}-${activeQRClass.batchEnd}
+                                </div>
+                              </div>
                             </div>
-                            <div class="instructions">
-                              Scan this QR code using the <strong>AttendX student portal</strong> to register your entry/exit session attendance.
+
+                            <div class="qr-outer-container">
+                              <div class="qr-frame-wrapper">
+                                <div class="qr-inner-white">
+                                  <img class="qr-img" src="${qrDataUrl}" />
+                                </div>
+                              </div>
+                              
+                              <div class="instructions-card">
+                                <span style="display: inline-block; width: 8px; height: 8px; background: #10b981; border-radius: 50%; box-shadow: 0 0 10px #10b981;"></span>
+                                SYSTEM READY FOR REAL-TIME SCANS
+                              </div>
                             </div>
-                            <div class="footer">Generated automatically via AttendX Faculty Terminal Console</div>
+
+                            <div class="footer">
+                              <div class="footer-instruction">
+                                Remember to scan when entering the room and scan again upon session departure.
+                              </div>
+                              <div class="footer-note">
+                                System Generated &bull; Secure Real-time Attendance Network
+                              </div>
+                            </div>
                           </div>
-                          <script>window.onload = function() { window.print(); }</script>
+
+                          <script>
+                            window.onload = function() {
+                              window.print();
+                              setTimeout(function() { window.close(); }, 500);
+                            };
+                          <\/script>
                         </body>
                         </html>
                       `);

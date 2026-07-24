@@ -4094,49 +4094,28 @@ export default function App() {
                               height: 297mm;
                               box-sizing: border-box;
                               font-family: 'Plus Jakarta Sans', sans-serif;
-                              background: #0b0f19; /* premium deep dark background */
-                              color: #f8fafc;
+                              background: radial-gradient(circle at top left, rgba(124, 58, 237, 0.05) 0%, transparent 60%),
+                                          radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.05) 0%, transparent 60%),
+                                          #ffffff;
+                              color: #0f172a;
                               display: flex;
                               flex-direction: column;
                               align-items: center;
                               justify-content: space-between;
                               position: relative;
                               overflow: hidden;
-                              padding: 20mm;
-                            }
-
-                            /* Decorative background blobs and patterns */
-                            .bg-gradient {
-                              position: absolute;
-                              top: -100mm;
-                              left: -100mm;
-                              width: 400mm;
-                              height: 400mm;
-                              background: radial-gradient(circle, rgba(124, 58, 237, 0.15) 0%, rgba(219, 39, 119, 0.05) 50%, transparent 100%);
-                              z-index: 1;
-                              pointer-events: none;
-                            }
-
-                            .bg-gradient-bottom {
-                              position: absolute;
-                              bottom: -150mm;
-                              right: -150mm;
-                              width: 350mm;
-                              height: 350mm;
-                              background: radial-gradient(circle, rgba(16, 185, 129, 0.12) 0%, rgba(59, 130, 246, 0.05) 60%, transparent 100%);
-                              z-index: 1;
-                              pointer-events: none;
+                              padding: 20mm 15mm;
                             }
 
                             /* Page decorative border frame */
                             .page-frame {
                               position: absolute;
-                              top: 10mm;
-                              left: 10mm;
-                              right: 10mm;
-                              bottom: 10mm;
-                              border: 2px solid rgba(255, 255, 255, 0.05);
-                              border-radius: 24px;
+                              top: 12mm;
+                              left: 12mm;
+                              right: 12mm;
+                              bottom: 12mm;
+                              border: 2px dashed rgba(124, 58, 237, 0.15);
+                              border-radius: 20px;
                               z-index: 2;
                               pointer-events: none;
                             }
@@ -4148,10 +4127,10 @@ export default function App() {
                               border: 4px solid #7c3aed;
                               z-index: 3;
                             }
-                            .c-tl { top: 8mm; left: 8mm; border-right: none; border-bottom: none; border-top-left-radius: 12px; }
-                            .c-tr { top: 8mm; right: 8mm; border-left: none; border-bottom: none; border-top-right-radius: 12px; }
-                            .c-bl { bottom: 8mm; left: 8mm; border-right: none; border-top: none; border-bottom-left-radius: 12px; }
-                            .c-br { bottom: 8mm; right: 8mm; border-left: none; border-top: none; border-bottom-right-radius: 12px; }
+                            .c-tl { top: 10mm; left: 10mm; border-right: none; border-bottom: none; border-top-left-radius: 12px; }
+                            .c-tr { top: 10mm; right: 10mm; border-left: none; border-bottom: none; border-top-right-radius: 12px; }
+                            .c-bl { bottom: 10mm; left: 10mm; border-right: none; border-top: none; border-bottom-left-radius: 12px; }
+                            .c-br { bottom: 10mm; right: 10mm; border-left: none; border-top: none; border-bottom-right-radius: 12px; }
 
                             .content-wrapper {
                               position: relative;
@@ -4172,69 +4151,66 @@ export default function App() {
                             }
 
                             .brand-pill {
-                              background: rgba(124, 58, 237, 0.15);
-                              border: 1px solid rgba(124, 58, 237, 0.3);
+                              background: rgba(124, 58, 237, 0.06);
+                              border: 1px solid rgba(124, 58, 237, 0.2);
                               padding: 8px 20px;
                               border-radius: 50px;
                               font-size: 14px;
                               font-weight: 700;
                               text-transform: uppercase;
                               letter-spacing: 2px;
-                              color: #a78bfa;
+                              color: #6d28d9;
                               margin-bottom: 20px;
-                              display: flex;
+                              display: inline-flex;
                               align-items: center;
                               gap: 8px;
-                              box-shadow: 0 4px 12px rgba(124, 58, 237, 0.15);
                             }
 
                             .title {
                               font-family: 'Outfit', sans-serif;
-                              font-size: 42px;
+                              font-size: 40px;
                               font-weight: 900;
                               margin: 0;
-                              letter-spacing: -1px;
+                              letter-spacing: -1.5px;
                               line-height: 1.1;
                               text-transform: uppercase;
-                              background: linear-gradient(135deg, #f8fafc 30%, #cbd5e1 100%);
-                              -webkit-background-clip: text;
-                              -webkit-text-fill-color: transparent;
+                              color: #1e1b4b;
                             }
 
                             .subtitle {
                               font-size: 15px;
-                              color: #94a3b8;
+                              color: #475569;
                               max-width: 480px;
-                              margin: 15px 0 0 0;
+                              margin: 12px 0 0 0;
                               line-height: 1.5;
+                              text-align: center;
                             }
 
                             .class-card {
-                              margin-top: 25px;
-                              background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
-                              border: 1px solid rgba(255, 255, 255, 0.08);
-                              border-radius: 20px;
-                              padding: 20px 40px;
-                              box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
-                              backdrop-filter: blur(10px);
+                              margin-top: 20px;
+                              background: #ffffff;
+                              border: 1px solid rgba(124, 58, 237, 0.15);
+                              border-radius: 16px;
+                              padding: 16px 36px;
+                              box-shadow: 0 10px 25px rgba(124, 58, 237, 0.06);
                               text-align: center;
-                              max-width: 520px;
+                              display: inline-block;
                             }
 
                             .class-name {
                               font-family: 'Outfit', sans-serif;
                               font-size: 32px;
                               font-weight: 900;
-                              background: linear-gradient(135deg, #a78bfa 0%, #db2777 100%);
+                              background: linear-gradient(135deg, #6d28d9 0%, #db2777 100%);
                               -webkit-background-clip: text;
                               -webkit-text-fill-color: transparent;
-                              margin-bottom: 8px;
+                              margin-bottom: 4px;
                             }
 
                             .class-meta {
-                              font-size: 14px;
-                              color: #94a3b8;
-                              font-weight: 600;
+                              font-size: 13px;
+                              color: #64748b;
+                              font-weight: 700;
                               letter-spacing: 0.5px;
                               text-transform: uppercase;
                             }
@@ -4248,36 +4224,24 @@ export default function App() {
                             }
 
                             .qr-frame-wrapper {
-                              padding: 24px;
+                              padding: 20px;
                               background: linear-gradient(135deg, #7c3aed, #db2777);
-                              border-radius: 36px;
-                              box-shadow: 0 25px 60px rgba(124, 58, 237, 0.35);
-                              position: relative;
-                            }
-
-                            .qr-frame-wrapper::after {
-                              content: '';
-                              position: absolute;
-                              top: -3px; left: -3px; right: -3px; bottom: -3px;
-                              background: linear-gradient(135deg, #a78bfa, #f43f5e);
-                              border-radius: 39px;
-                              z-index: -1;
-                              opacity: 0.5;
+                              border-radius: 32px;
+                              box-shadow: 0 20px 50px rgba(124, 58, 237, 0.18);
                             }
 
                             .qr-inner-white {
                               background: #ffffff;
-                              padding: 16px;
-                              border-radius: 24px;
+                              padding: 12px;
+                              border-radius: 20px;
                               display: flex;
                               align-items: center;
                               justify-content: center;
-                              box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.05);
                             }
 
                             .qr-img {
-                              width: 320px;
-                              height: 320px;
+                              width: 280px;
+                              height: 280px;
                               display: block;
                             }
 
@@ -4285,29 +4249,28 @@ export default function App() {
                               margin-top: 20px;
                               display: flex;
                               align-items: center;
-                              gap: 12px;
-                              background: rgba(16, 185, 129, 0.1);
-                              border: 1px solid rgba(16, 185, 129, 0.25);
-                              padding: 12px 24px;
+                              gap: 8px;
+                              background: rgba(16, 185, 129, 0.08);
+                              border: 1px solid rgba(16, 185, 129, 0.2);
+                              padding: 10px 24px;
                               border-radius: 50px;
-                              color: #34d399;
+                              color: #065f46;
                               font-weight: 700;
-                              font-size: 14px;
-                              box-shadow: 0 4px 15px rgba(16, 185, 129, 0.1);
+                              font-size: 13px;
                             }
 
                             .footer {
-                              margin-bottom: 8mm;
+                              margin-bottom: 10mm;
                               display: flex;
                               flex-direction: column;
                               align-items: center;
-                              gap: 10px;
+                              gap: 8px;
                             }
 
                             .footer-instruction {
-                              font-size: 16px;
+                              font-size: 15px;
                               font-weight: 700;
-                              color: #cbd5e1;
+                              color: #334155;
                               letter-spacing: 0.5px;
                               text-transform: uppercase;
                               max-width: 480px;
@@ -4318,16 +4281,25 @@ export default function App() {
                             .footer-note {
                               font-size: 11px;
                               color: #64748b;
-                              font-weight: 500;
+                              font-weight: 600;
                               letter-spacing: 1px;
                               text-transform: uppercase;
+                            }
+                            
+                            @media print {
+                              body {
+                                -webkit-print-color-adjust: exact;
+                                print-color-adjust: exact;
+                              }
+                              html, body {
+                                height: 297mm;
+                                overflow: hidden;
+                                page-break-inside: avoid;
+                              }
                             }
                           </style>
                         </head>
                         <body>
-                          <div class="bg-gradient"></div>
-                          <div class="bg-gradient-bottom"></div>
-                          
                           <div class="page-frame"></div>
                           <div class="corner-decor c-tl"></div>
                           <div class="corner-decor c-tr"></div>
